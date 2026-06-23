@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: menu-od-miki
+    name: MJM
     env: node
     plan: starter
     buildCommand: npm ci && npm run build
