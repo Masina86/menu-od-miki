@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+/* Prevent horizontal layout shift when content height changes (e.g. language switch). */
+html {
+  scrollbar-gutter: stable;
+  overflow-y: scroll;
+}
+
+/* Disable scroll anchoring to prevent tiny scroll jumps on content reflow (e.g. EN strings). */
+html,
+body,
+#root {
+  overflow-anchor: none;
+}

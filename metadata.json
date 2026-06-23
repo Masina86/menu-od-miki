@@ -1,0 +1,5 @@
+{
+  "name": "MenuQR - Digital Restaurant Menu",
+  "description": "A platform for restaurants to create, manage, and share digital menus via QR codes with prices and descriptions.",
+  "requestFramePermissions": []
+}
