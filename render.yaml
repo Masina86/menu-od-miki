@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: MJM
+    name: mjm
     env: node
     plan: starter
     buildCommand: npm ci && npm run build
