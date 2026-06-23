@@ -233,6 +233,23 @@ async function startServer() {
     res.json(toJSON(restaurant));
   });
 
+  // Update Restaurant Slug
+  app.put("/api/restaurant/:id/slug", (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { slug } = req.body;
+      if (isNaN(id)) throw new Error("Invalid restaurant ID");
+      if (!slug || typeof slug !== "string") throw new Error("Invalid slug");
+      const existing = db.prepare("SELECT id FROM restaurants WHERE slug = ? AND id != ?").get(slug, id);
+      if (existing) throw new Error("Slug already in use by another restaurant");
+      const result = db.prepare("UPDATE restaurants SET slug = ? WHERE id = ?").run(slug, id);
+      res.json({ success: true, changes: result.changes, slug });
+    } catch (error: any) {
+      console.error("[api] Error updating restaurant slug:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Update Restaurant
   app.put("/api/restaurant/:id", (req, res) => {
     try {
