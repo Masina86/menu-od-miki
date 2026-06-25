@@ -4,6 +4,12 @@
 html {
   scrollbar-gutter: stable;
   overflow-y: scroll;
+  background-color: #1c1917;
+  color-scheme: dark;
+}
+
+body {
+  background-color: #1c1917;
 }
 
 /* Disable scroll anchoring to prevent tiny scroll jumps on content reflow (e.g. EN strings). */
