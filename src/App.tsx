@@ -8,7 +8,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         {/* Default to a demo restaurant for the landing page */}
-        <Route path="/" element={<Navigate to="/demo-restaurant/admin" replace />} />
+        <Route path="/" element={<Navigate to="/dismak-oil/admin" replace />} />
         
         {/* Admin Route */}
         <Route path="/:slug/admin" element={<AdminPanel />} />

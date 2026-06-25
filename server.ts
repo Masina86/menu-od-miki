@@ -40,6 +40,25 @@ try {
 
 const db = new Database(resolvedDbPath);
 
+// One-time slug migration for deployed instances with old URLs.
+try {
+  db.prepare(
+    `DELETE FROM restaurants
+     WHERE slug IN ('demo-restaurant', 'Dismak-Oil')
+       AND id NOT IN (SELECT DISTINCT restaurant_id FROM categories WHERE restaurant_id IS NOT NULL)`,
+  ).run();
+  const slugMigration = db
+    .prepare(
+      "UPDATE restaurants SET slug = 'dismak-oil' WHERE slug IN ('demo-restaurant', 'Dismak-Oil')",
+    )
+    .run();
+  if (slugMigration.changes > 0) {
+    console.log(`[db] migrated slug to dismak-oil (${slugMigration.changes} row(s))`);
+  }
+} catch (e) {
+  console.warn("[db] slug migration warning:", e);
+}
+
 // Initialize Database
 db.exec(`
   CREATE TABLE IF NOT EXISTS restaurants (
