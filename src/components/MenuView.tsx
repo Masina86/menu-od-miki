@@ -19,6 +19,8 @@ import {
   ChevronUp,
   Search,
   X,
+  Wifi,
+  Phone,
   MapPin,
   Moon,
   Sun,
