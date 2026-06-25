@@ -19,9 +19,9 @@ import {
   ChevronUp,
   Search,
   X,
-  Wifi,
-  Phone,
   MapPin,
+  Moon,
+  Sun,
   Star,
   Sparkles,
   AlertCircle,
@@ -633,12 +633,25 @@ export default function MenuView() {
   const [language, setLanguage] = useState<Language>("MK");
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
-  const darkMode = true;
+  const [darkMode, setDarkMode] = useState(false);
   const [showWifi, setShowWifi] = useState(false);
   const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
+
+  // Persist dark mode
+  useEffect(() => {
+    const saved = localStorage.getItem("menuDarkMode");
+    if (saved === "1") setDarkMode(true);
+  }, []);
+
+  const toggleDark = () => {
+    setDarkMode((d) => {
+      localStorage.setItem("menuDarkMode", d ? "0" : "1");
+      return !d;
+    });
+  };
 
   // Back to top scroll detection
   useEffect(() => {
@@ -731,7 +744,7 @@ export default function MenuView() {
       className={`min-h-screen font-sans selection:bg-stone-200 relative transition-colors duration-300 ${bg}`}
     >
       <div className="relative z-10">
-        {/* ── Top-left: Admin + WiFi */}
+        {/* ── Top-left: Admin + Dark Mode + WiFi */}
         <div className="fixed top-4 left-4 z-50 flex items-center gap-2">
           <Link
             to={`/${slug}/admin`}
@@ -745,6 +758,19 @@ export default function MenuView() {
           >
             <Settings size={18} />
           </Link>
+
+          <button
+            onClick={toggleDark}
+            className={`p-2.5 rounded-full shadow-sm border backdrop-blur-md transition-all hover:scale-105
+              ${
+                darkMode
+                  ? "bg-stone-800/90 border-stone-700 text-amber-400 hover:text-amber-300"
+                  : "bg-white/80 border-stone-200 text-stone-400 hover:text-stone-900"
+              }`}
+            title="Toggle Dark Mode"
+          >
+            {darkMode ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
 
           {hasWifi && (
             <button
