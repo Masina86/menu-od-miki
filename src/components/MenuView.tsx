@@ -9,7 +9,6 @@ import {
   AllergenKey,
   ALLERGEN_ICONS,
   ALLERGEN_LABELS,
-  Review,
 } from "../types";
 import { ImageModal } from "./ImageModal";
 import {
@@ -393,7 +392,7 @@ const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
   darkMode,
   searchQuery,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(idx === 0 || isSubcategory);
+  const [isExpanded, setIsExpanded] = useState(isSubcategory);
   const name = getLangValue(category, "name", language);
 
   // Filter products by search query
@@ -550,8 +549,6 @@ interface CategoryNavProps {
   language: Language;
   darkMode: boolean;
   activeId: number | null;
-  onOpenReviews: () => void;
-  reviewCount: number;
 }
 
 const CategoryNav: React.FC<CategoryNavProps> = ({
@@ -559,8 +556,6 @@ const CategoryNav: React.FC<CategoryNavProps> = ({
   language,
   darkMode,
   activeId,
-  onOpenReviews,
-  reviewCount,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -588,54 +583,10 @@ const CategoryNav: React.FC<CategoryNavProps> = ({
       ${darkMode ? "bg-stone-900/90 border-stone-700" : "bg-white/90 border-stone-100"}`}
     >
       <div className="relative">
-        {/* Right-side reviews button (fixed position within bar) */}
-        <div className="absolute right-4 top-1/2 -translate-y-1/2 z-10">
-          <button
-            onClick={onOpenReviews}
-            className={`relative inline-flex items-center gap-2 px-3 py-2 rounded-full shadow-sm border backdrop-blur-md transition-all hover:scale-105
-              ${
-                darkMode
-                  ? "bg-amber-500/15 border-amber-500/30 text-amber-300 hover:text-amber-200"
-                  : "bg-amber-100/80 border-amber-200 text-amber-700 hover:text-amber-800"
-              }`}
-            title={
-              language === "MK"
-                ? "Отвори оценки"
-                : language === "BG"
-                  ? "Отвори отзиви"
-                  : "Open reviews"
-            }
-            aria-label={
-              language === "MK"
-                ? "Оценки"
-                : language === "BG"
-                  ? "Отзиви"
-                  : "Reviews"
-            }
-          >
-            <Star size={18} />
-            <span className="text-[10px] font-bold tracking-wider uppercase hidden sm:inline">
-              {language === "MK"
-                ? "Оценки"
-                : language === "BG"
-                  ? "Отзиви"
-                  : "Reviews"}
-            </span>
-            {reviewCount > 0 && (
-              <span
-                className={`absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold leading-[18px] text-center shadow
-                  ${darkMode ? "bg-amber-400 text-stone-900" : "bg-amber-500 text-white"}`}
-              >
-                {reviewCount > 99 ? "99+" : reviewCount}
-              </span>
-            )}
-          </button>
-        </div>
-
-        {/* Scrollable pills (extra right padding so it never overlaps the button) */}
+        {/* Scrollable pills */}
         <div
           ref={scrollRef}
-          className="flex justify-center overflow-x-scroll overflow-y-hidden gap-1 px-4 py-2 pr-20 scrollbar-none"
+          className="flex justify-center overflow-x-scroll overflow-y-hidden gap-1 px-4 py-2 scrollbar-none"
           style={
             {
               scrollbarWidth: "none",
@@ -688,14 +639,6 @@ export default function MenuView() {
   const [showWifi, setShowWifi] = useState(false);
   const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [reviewName, setReviewName] = useState("");
-  const [reviewRating, setReviewRating] = useState(0);
-  const [reviewHover, setReviewHover] = useState(0);
-  const [reviewComment, setReviewComment] = useState("");
-  const [reviewSubmitting, setReviewSubmitting] = useState(false);
-  const [reviewSubmitted, setReviewSubmitted] = useState(false);
-  const [showReviews, setShowReviews] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
 
@@ -755,43 +698,12 @@ export default function MenuView() {
       const resMenu = await fetch(`/api/menu/${rest.id}`);
       const menuData = await resMenu.json();
       setMenu(menuData);
-      const resReviews = await fetch(`/api/reviews/${rest.id}`);
-      const reviewsData = await resReviews.json();
-      setReviews(Array.isArray(reviewsData) ? reviewsData : []);
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
       setLoading(false);
     }
   }, [slug]);
-
-  const submitReview = async () => {
-    if (!restaurant || reviewRating === 0) return;
-    setReviewSubmitting(true);
-    try {
-      const res = await fetch(`/api/reviews/${restaurant.id}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          author_name: reviewName.trim() || "Anonymous",
-          rating: reviewRating,
-          comment: reviewComment.trim(),
-        }),
-      });
-      if (!res.ok) throw new Error("Failed to submit review");
-      const newReview = await res.json();
-      setReviews((prev) => [newReview, ...prev]);
-      setReviewName("");
-      setReviewRating(0);
-      setReviewComment("");
-      setReviewSubmitted(true);
-      setTimeout(() => setReviewSubmitted(false), 4000);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setReviewSubmitting(false);
-    }
-  };
 
   useEffect(() => {
     fetchData();
@@ -1201,8 +1113,6 @@ export default function MenuView() {
           language={language}
           darkMode={darkMode}
           activeId={activeCategoryId}
-          onOpenReviews={() => setShowReviews(true)}
-          reviewCount={reviews.length}
         />
 
         {/* ── Main Content */}
@@ -1410,183 +1320,6 @@ export default function MenuView() {
           language={language}
           darkMode={darkMode}
         />
-
-        {/* ── Reviews Modal */}
-        <AnimatePresence>
-          {showReviews && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[70] flex items-center justify-center p-4 md:p-8"
-            >
-              <div
-                className="fixed inset-0 bg-stone-900/50 backdrop-blur-xl"
-                onClick={() => setShowReviews(false)}
-              />
-
-              <motion.div
-                initial={{ scale: 0.96, opacity: 0, y: 10 }}
-                animate={{ scale: 1, opacity: 1, y: 0 }}
-                exit={{ scale: 0.96, opacity: 0, y: 10 }}
-                transition={{ type: "spring", stiffness: 320, damping: 28 }}
-                className={`relative w-full max-w-xl rounded-[2rem] shadow-2xl overflow-hidden ${darkMode ? "bg-stone-900 text-stone-100" : "bg-white text-stone-900"}`}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button
-                  onClick={() => setShowReviews(false)}
-                  className={`absolute top-5 right-5 z-20 p-2.5 rounded-full transition-all
-                    ${darkMode ? "bg-stone-700/80 text-stone-300 hover:bg-stone-600 hover:text-white" : "bg-stone-100 text-stone-500 hover:bg-stone-200"}`}
-                  title="Close"
-                >
-                  <X size={18} />
-                </button>
-
-                <div className="p-8 md:p-10 space-y-6">
-                  <h3
-                    className={`text-center text-xs uppercase tracking-widest font-bold ${darkMode ? "text-stone-500" : "text-stone-400"}`}
-                  >
-                    {language === "MK"
-                      ? "Оцени & Коментари"
-                      : language === "BG"
-                        ? "Отзиви"
-                        : "Reviews"}
-                  </h3>
-
-                  {/* Existing reviews */}
-                  {reviews.length > 0 && (
-                    <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
-                      {reviews.map((r) => (
-                        <div
-                          key={r.id}
-                          className={`rounded-2xl px-4 py-3 text-sm ${darkMode ? "bg-stone-800" : "bg-stone-50 border border-stone-100"}`}
-                        >
-                          <div className="flex items-center justify-between mb-1">
-                            <span
-                              className={`font-semibold text-xs ${darkMode ? "text-stone-300" : "text-stone-700"}`}
-                            >
-                              {r.author_name}
-                            </span>
-                            <div className="flex items-center gap-0.5">
-                              {[1, 2, 3, 4, 5].map((s) => (
-                                <Star
-                                  key={s}
-                                  size={12}
-                                  className={
-                                    s <= r.rating
-                                      ? "text-amber-400 fill-amber-400"
-                                      : darkMode
-                                        ? "text-stone-600"
-                                        : "text-stone-200"
-                                  }
-                                />
-                              ))}
-                            </div>
-                          </div>
-                          {r.comment && (
-                            <p
-                              className={`text-xs leading-relaxed ${darkMode ? "text-stone-400" : "text-stone-500"}`}
-                            >
-                              {r.comment}
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Review form */}
-                  <div
-                    className={`rounded-2xl p-4 space-y-3 ${darkMode ? "bg-stone-800" : "bg-stone-50 border border-stone-100"}`}
-                  >
-                    {reviewSubmitted ? (
-                      <p className="text-center text-sm text-green-500 font-medium py-2">
-                        {language === "MK"
-                          ? "Ви благодариме за оценката! 🙏"
-                          : language === "BG"
-                            ? "Благодарим за отзива! 🙏"
-                            : "Thank you for your review! 🙏"}
-                      </p>
-                    ) : (
-                      <>
-                        <input
-                          type="text"
-                          placeholder={
-                            language === "MK"
-                              ? "Вашето име (необврзно)"
-                              : language === "BG"
-                                ? "Вашето име (по избор)"
-                                : "Your name (optional)"
-                          }
-                          value={reviewName}
-                          onChange={(e) => setReviewName(e.target.value)}
-                          className={`w-full text-sm rounded-xl px-3 py-2 outline-none border focus:ring-2 focus:ring-stone-400
-                            ${darkMode ? "bg-stone-700 border-stone-600 text-stone-100 placeholder-stone-500" : "bg-white border-stone-200 text-stone-800 placeholder-stone-400"}`}
-                        />
-                        <div className="flex items-center justify-center gap-2">
-                          {[1, 2, 3, 4, 5].map((s) => (
-                            <button
-                              key={s}
-                              onClick={() => setReviewRating(s)}
-                              onMouseEnter={() => setReviewHover(s)}
-                              onMouseLeave={() => setReviewHover(0)}
-                              className="transition-transform hover:scale-125"
-                            >
-                              <Star
-                                size={28}
-                                className={
-                                  s <= (reviewHover || reviewRating)
-                                    ? "text-amber-400 fill-amber-400"
-                                    : darkMode
-                                      ? "text-stone-600"
-                                      : "text-stone-200"
-                                }
-                              />
-                            </button>
-                          ))}
-                        </div>
-                        <textarea
-                          placeholder={
-                            language === "MK"
-                              ? "Напишете коментар..."
-                              : language === "BG"
-                                ? "Напишете коментар..."
-                                : "Write a comment..."
-                          }
-                          value={reviewComment}
-                          onChange={(e) => setReviewComment(e.target.value)}
-                          rows={3}
-                          className={`w-full text-sm rounded-xl px-3 py-2 outline-none border focus:ring-2 focus:ring-stone-400 resize-none
-                            ${darkMode ? "bg-stone-700 border-stone-600 text-stone-100 placeholder-stone-500" : "bg-white border-stone-200 text-stone-800 placeholder-stone-400"}`}
-                        />
-                        <button
-                          onClick={submitReview}
-                          disabled={reviewRating === 0 || reviewSubmitting}
-                          className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all
-                            ${reviewRating === 0 ? "opacity-40 cursor-not-allowed" : ""}
-                            ${darkMode ? "bg-stone-100 text-stone-900 hover:bg-white" : "bg-stone-900 text-white hover:bg-stone-700"}`}
-                        >
-                          <Send size={14} />
-                          {reviewSubmitting
-                            ? language === "MK"
-                              ? "Се испраќа..."
-                              : language === "BG"
-                                ? "Изпращане..."
-                                : "Sending..."
-                            : language === "MK"
-                              ? "Испрати оцена"
-                              : language === "BG"
-                                ? "Изпрати отзив"
-                                : "Submit Review"}
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
     </div>
   );
