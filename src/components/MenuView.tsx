@@ -465,7 +465,7 @@ const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
               <img
                 src={category.products.find((p) => p.image_url)?.image_url}
                 alt=""
-                className={`w-10 h-10 rounded-full object-cover border shadow-sm opacity-50 flex-shrink-0
+                className={`w-10 h-10 rounded-full object-cover border shadow-sm flex-shrink-0
                   ${darkMode ? "border-stone-600" : "border-stone-200"}`}
               />
             )
