@@ -472,7 +472,7 @@ const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
           )}
           <h2
             className={`font-serif whitespace-nowrap transition-colors truncate
-            ${isSubcategory ? "text-lg" : "text-2xl md:text-3xl"}
+            ${isSubcategory ? "text-base md:text-lg" : "text-xl md:text-2xl"}
             ${darkMode ? "text-stone-100 group-hover:text-stone-300" : "text-stone-900 group-hover:text-stone-600"}`}
           >
             {name}
