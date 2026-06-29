@@ -6,6 +6,7 @@ import { fileURLToPath } from "url";
 import fs from "fs";
 import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
+import crypto from "crypto";
 
 // Prefer local-only secrets file if present.
 dotenv.config({ path: ".env.local" });
@@ -163,6 +164,23 @@ async function startServer() {
   const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
   const ai = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
   const translationCache = new Map<string, string>();
+  const ADMIN_PASSWORD =
+    process.env.ADMIN_PASSWORD ||
+    (process.env.NODE_ENV === "production" ? "" : "admin");
+  const ADMIN_SESSION_SECRET =
+    process.env.ADMIN_SESSION_SECRET ||
+    ADMIN_PASSWORD ||
+    "dev-admin-session-secret";
+  const ADMIN_COOKIE = "menu_admin_session";
+  const ADMIN_SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+  if (!process.env.ADMIN_PASSWORD) {
+    console.warn(
+      process.env.NODE_ENV === "production"
+        ? "[auth] ADMIN_PASSWORD is not set. Admin login is disabled."
+        : "[auth] ADMIN_PASSWORD is not set. Using development password: admin",
+    );
+  }
 
   const isBlank = (v: any) => v == null || String(v).trim() === "";
 
@@ -213,6 +231,116 @@ async function startServer() {
       console.log(`[api] ${req.method} ${req.originalUrl}`);
     }
     next();
+  });
+
+  const parseCookies = (cookieHeader?: string) => {
+    const cookies: Record<string, string> = {};
+    if (!cookieHeader) return cookies;
+    cookieHeader.split(";").forEach((part) => {
+      const [rawName, ...rawValue] = part.trim().split("=");
+      if (!rawName) return;
+      cookies[rawName] = decodeURIComponent(rawValue.join("=") || "");
+    });
+    return cookies;
+  };
+
+  const signSession = (payload: string) =>
+    crypto
+      .createHmac("sha256", ADMIN_SESSION_SECRET)
+      .update(payload)
+      .digest("base64url");
+
+  const createAdminSession = () => {
+    const payload = Buffer.from(
+      JSON.stringify({
+        role: "admin",
+        exp: Date.now() + ADMIN_SESSION_MAX_AGE_MS,
+      }),
+    ).toString("base64url");
+    return `${payload}.${signSession(payload)}`;
+  };
+
+  const isAdminSessionValid = (cookieHeader?: string) => {
+    const token = parseCookies(cookieHeader)[ADMIN_COOKIE];
+    if (!token) return false;
+    const [payload, signature] = token.split(".");
+    if (!payload || !signature) return false;
+
+    const expected = signSession(payload);
+    const signatureBuffer = Buffer.from(signature);
+    const expectedBuffer = Buffer.from(expected);
+    if (
+      signatureBuffer.length !== expectedBuffer.length ||
+      !crypto.timingSafeEqual(signatureBuffer, expectedBuffer)
+    ) {
+      return false;
+    }
+
+    try {
+      const session = JSON.parse(Buffer.from(payload, "base64url").toString());
+      return session.role === "admin" && Number(session.exp) > Date.now();
+    } catch {
+      return false;
+    }
+  };
+
+  const setAdminCookie = (res: any, token: string) => {
+    res.setHeader(
+      "Set-Cookie",
+      `${ADMIN_COOKIE}=${encodeURIComponent(token)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${Math.floor(
+        ADMIN_SESSION_MAX_AGE_MS / 1000,
+      )}`,
+    );
+  };
+
+  const clearAdminCookie = (res: any) => {
+    res.setHeader(
+      "Set-Cookie",
+      `${ADMIN_COOKIE}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`,
+    );
+  };
+
+  app.post("/api/auth/login", (req, res) => {
+    const { password } = req.body;
+    if (!ADMIN_PASSWORD) {
+      return res.status(503).json({ error: "Admin login is not configured." });
+    }
+
+    const submitted = Buffer.from(String(password || ""));
+    const expected = Buffer.from(ADMIN_PASSWORD);
+    const isValid =
+      submitted.length === expected.length &&
+      crypto.timingSafeEqual(submitted, expected);
+
+    if (!isValid) {
+      return res.status(401).json({ error: "Invalid password." });
+    }
+
+    setAdminCookie(res, createAdminSession());
+    res.json({ authenticated: true });
+  });
+
+  app.post("/api/auth/logout", (_req, res) => {
+    clearAdminCookie(res);
+    res.json({ authenticated: false });
+  });
+
+  app.get("/api/auth/session", (req, res) => {
+    res.json({ authenticated: isAdminSessionValid(req.headers.cookie) });
+  });
+
+  app.use("/api", (req, res, next) => {
+    const publicApi =
+      req.path.startsWith("/auth/") ||
+      req.path.startsWith("/public-menu/") ||
+      req.path.startsWith("/images/") ||
+      req.path.startsWith("/reviews/");
+
+    if (publicApi || isAdminSessionValid(req.headers.cookie)) {
+      return next();
+    }
+
+    res.status(401).json({ error: "Admin login required." });
   });
 
   // Helper to ensure IDs (BigInts from SQLite) are serializable

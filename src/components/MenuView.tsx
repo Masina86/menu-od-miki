@@ -645,6 +645,7 @@ export default function MenuView() {
   const [showWifi, setShowWifi] = useState(false);
   const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
 
@@ -714,6 +715,21 @@ export default function MenuView() {
     fetchData();
   }, [fetchData]);
 
+  useEffect(() => {
+    const checkAdminSession = async () => {
+      try {
+        const res = await fetch("/api/auth/session");
+        if (!res.ok) return;
+        const data = await res.json();
+        setIsAdminAuthenticated(!!data.authenticated);
+      } catch (error) {
+        console.error("Error checking admin session:", error);
+      }
+    };
+
+    checkAdminSession();
+  }, []);
+
   // ── Loading state
   if (loading)
     return (
@@ -753,18 +769,20 @@ export default function MenuView() {
       <div className="relative z-10">
         {/* ── Top-left: Admin + Dark Mode + WiFi */}
         <div className="fixed top-4 left-4 z-50 flex items-center gap-2">
-          <Link
-            to={`/${slug}/admin`}
-            className={`p-2.5 rounded-full shadow-sm border backdrop-blur-md transition-all hover:scale-105
-              ${
-                darkMode
-                  ? "bg-stone-800/90 border-stone-700 text-stone-400 hover:text-stone-100"
-                  : "bg-white/80 border-stone-200 text-stone-400 hover:text-stone-900"
-              }`}
-            title={t("back_to_admin", language)}
-          >
-            <Settings size={18} />
-          </Link>
+          {isAdminAuthenticated && (
+            <Link
+              to={`/${slug}/admin`}
+              className={`p-2.5 rounded-full shadow-sm border backdrop-blur-md transition-all hover:scale-105
+                ${
+                  darkMode
+                    ? "bg-stone-800/90 border-stone-700 text-stone-400 hover:text-stone-100"
+                    : "bg-white/80 border-stone-200 text-stone-400 hover:text-stone-900"
+                }`}
+              title={t("back_to_admin", language)}
+            >
+              <Settings size={18} />
+            </Link>
+          )}
 
           <button
             onClick={toggleDark}

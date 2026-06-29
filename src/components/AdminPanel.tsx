@@ -18,6 +18,8 @@ import {
   Download,
   Image as ImageIcon,
   X,
+  Lock,
+  LogOut,
 } from "lucide-react";
 import { motion, AnimatePresence, Reorder } from "motion/react";
 import { Restaurant, Category, Product } from "../types";
@@ -1404,6 +1406,12 @@ const CategorySection: React.FC<CategorySectionProps> = ({
 
 export default function AdminPanel() {
   const { slug } = useParams<{ slug: string }>();
+  const [authStatus, setAuthStatus] = useState<
+    "checking" | "authenticated" | "unauthenticated"
+  >("checking");
+  const [adminPassword, setAdminPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [menu, setMenu] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1488,14 +1496,76 @@ export default function AdminPanel() {
   }, []);
 
   useEffect(() => {
-    if (slug) {
+    const checkSession = async () => {
+      try {
+        const res = await fetch("/api/auth/session");
+        const data = await res.json();
+        setAuthStatus(data.authenticated ? "authenticated" : "unauthenticated");
+        setLoading(data.authenticated);
+      } catch (error) {
+        console.error("Error checking admin session:", error);
+        setAuthStatus("unauthenticated");
+        setLoading(false);
+      }
+    };
+
+    checkSession();
+  }, []);
+
+  useEffect(() => {
+    if (slug && authStatus === "authenticated") {
+      setLoading(true);
       fetchData();
     }
-  }, [slug]);
+  }, [slug, authStatus]);
+
+  const login = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError("");
+    setIsLoggingIn(true);
+
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: adminPassword }),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data.error || "Login failed.");
+      }
+
+      setAdminPassword("");
+      setAuthStatus("authenticated");
+    } catch (error: any) {
+      setLoginError(error.message || "Login failed.");
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch (error) {
+      console.error("Error logging out:", error);
+    } finally {
+      setRestaurant(null);
+      setMenu([]);
+      setAuthStatus("unauthenticated");
+      setLoading(false);
+    }
+  };
 
   const fetchData = async () => {
     try {
       const resRest = await fetch(`/api/restaurant/${slug}`);
+      if (resRest.status === 401) {
+        setAuthStatus("unauthenticated");
+        return;
+      }
+      if (!resRest.ok) throw new Error("Failed to load restaurant");
       const rest = await resRest.json();
       setRestaurant(rest);
       setEditRestaurantName(rest.name);
@@ -1509,6 +1579,11 @@ export default function AdminPanel() {
       setInstagramUrl(rest.instagram_url || "");
 
       const resMenu = await fetch(`/api/menu/${rest.id}`);
+      if (resMenu.status === 401) {
+        setAuthStatus("unauthenticated");
+        return;
+      }
+      if (!resMenu.ok) throw new Error("Failed to load menu");
       const menuData = await resMenu.json();
       setMenu(menuData);
     } catch (error) {
@@ -1957,12 +2032,57 @@ export default function AdminPanel() {
     }
   };
 
-  if (loading)
+  if (authStatus === "checking" || loading)
     return (
       <div className="flex items-center justify-center h-screen">
         Loading...
       </div>
     );
+
+  if (authStatus === "unauthenticated")
+    return (
+      <div className="min-h-screen bg-stone-50 text-stone-900 font-sans flex items-center justify-center p-6">
+        <form
+          onSubmit={login}
+          className="w-full max-w-sm bg-white border border-stone-200 rounded-2xl shadow-xl p-8 space-y-5"
+        >
+          <div className="w-12 h-12 rounded-full bg-stone-900 text-stone-50 flex items-center justify-center">
+            <Lock size={20} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-serif">Admin Login</h1>
+            <p className="text-sm text-stone-500 mt-1">
+              Enter the owner password to edit this menu.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] uppercase tracking-widest text-stone-400 font-bold">
+              Password
+            </label>
+            <input
+              type="password"
+              value={adminPassword}
+              onChange={(e) => setAdminPassword(e.target.value)}
+              className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-stone-400"
+              autoFocus
+            />
+          </div>
+          {loginError && (
+            <p className="text-sm text-red-500" role="alert">
+              {loginError}
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={isLoggingIn}
+            className="w-full bg-stone-900 text-stone-50 px-4 py-3 rounded-xl text-sm font-bold uppercase tracking-widest hover:bg-stone-800 disabled:opacity-60 transition-colors"
+          >
+            {isLoggingIn ? "Signing in..." : "Sign In"}
+          </button>
+        </form>
+      </div>
+    );
+
   if (!restaurant) return <div>Restaurant not found</div>;
 
   const menuUrl = `${window.location.origin}/${restaurant.slug}`;
@@ -2235,6 +2355,13 @@ export default function AdminPanel() {
             </p>
           </div>
           <div className="flex gap-3">
+            <button
+              onClick={logout}
+              className="flex items-center gap-2 border border-stone-300 px-4 py-2 rounded-full text-sm hover:bg-stone-100 transition-colors"
+            >
+              <LogOut size={16} />
+              Logout
+            </button>
             <button
               onClick={() => setShowQR(!showQR)}
               className="flex items-center gap-2 bg-stone-900 text-stone-50 px-4 py-2 rounded-full text-sm hover:bg-stone-800 transition-colors"
