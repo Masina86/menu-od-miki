@@ -2092,18 +2092,6 @@ export default function AdminPanel() {
               {loginError}
             </p>
           )}
-          <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-500 space-y-2">
-            <div className="flex items-start gap-2">
-              <Info size={16} className="mt-0.5 flex-shrink-0 text-stone-400" />
-              <p>
-                Local password is read from <span className="font-mono">.env.local</span>.
-                Render password is read from the Render Environment page.
-              </p>
-            </div>
-            <p>
-              For Render, set <span className="font-mono">ADMIN_PASSWORD</span> to the owner password and redeploy.
-            </p>
-          </div>
           <button
             type="submit"
             disabled={isLoggingIn}

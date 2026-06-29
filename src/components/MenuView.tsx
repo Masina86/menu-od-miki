@@ -204,9 +204,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
       className={`group flex gap-4 items-start py-4 border-b last:border-0 transition-opacity
         ${darkMode ? "border-stone-700" : "border-stone-100"}
         ${!isAvailable ? "opacity-50" : ""}`}
@@ -609,15 +606,15 @@ const CategoryNav: React.FC<CategoryNavProps> = ({
                 key={cat.id}
                 data-cat={cat.id}
                 onClick={() => scrollTo(cat.id)}
-                className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap
+                className={`flex-shrink-0 px-4 py-1.5 border-b-2 text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap
                   ${
                     isActive
                       ? darkMode
-                        ? "bg-stone-100 text-stone-900"
-                        : "bg-stone-900 text-white shadow"
+                        ? "text-stone-100 border-stone-100"
+                        : "text-stone-900 border-stone-900"
                       : darkMode
-                        ? "text-stone-400 hover:text-stone-100 hover:bg-stone-700"
-                        : "text-stone-400 hover:text-stone-700 hover:bg-stone-100"
+                        ? "text-stone-500 border-transparent hover:text-stone-300"
+                        : "text-stone-400 border-transparent hover:text-stone-600"
                   }`}
               >
                 {getLangValue(cat, "name", language)}
@@ -645,6 +642,7 @@ export default function MenuView() {
   const [showWifi, setShowWifi] = useState(false);
   const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
@@ -662,9 +660,12 @@ export default function MenuView() {
     });
   };
 
-  // Back to top scroll detection
+  // Scroll detection
   useEffect(() => {
-    const onScroll = () => setShowBackToTop(window.scrollY > 350);
+    const onScroll = () => {
+      setShowBackToTop(window.scrollY > 350);
+      setIsScrolled(window.scrollY > 50);
+    };
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
@@ -703,7 +704,22 @@ export default function MenuView() {
       if (!res.ok) throw new Error(`Failed to load menu (${res.status})`);
       const data = await res.json();
       setRestaurant(data.restaurant);
-      setMenu(data.menu);
+      
+      const sortedMenu = (data.menu || []).sort((a: Category, b: Category) => (a.sort_order || 0) - (b.sort_order || 0));
+      sortedMenu.forEach((cat: Category) => {
+        if (cat.products) {
+          cat.products.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+        }
+        if (cat.subcategories) {
+          cat.subcategories.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+          cat.subcategories.forEach(sub => {
+            if (sub.products) {
+              sub.products.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+            }
+          });
+        }
+      });
+      setMenu(sortedMenu);
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -768,7 +784,11 @@ export default function MenuView() {
     >
       <div className="relative z-10">
         {/* ── Top-left: Admin + Dark Mode + WiFi */}
-        <div className="fixed top-4 left-4 z-50 flex items-center gap-2">
+        <div
+          className={`fixed top-4 left-4 z-50 flex items-center gap-2 transition-all duration-300 ${
+            isScrolled ? "-translate-y-[150%] opacity-0 pointer-events-none" : "translate-y-0 opacity-100"
+          }`}
+        >
           {isAdminAuthenticated && (
             <Link
               to={`/${slug}/admin`}
@@ -862,7 +882,11 @@ export default function MenuView() {
         </div>
 
         {/* ── Top-right: Search + Language */}
-        <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
+        <div
+          className={`fixed top-4 right-4 z-50 flex items-center gap-2 transition-all duration-300 ${
+            isScrolled ? "-translate-y-[150%] opacity-0 pointer-events-none" : "translate-y-0 opacity-100"
+          }`}
+        >
           {/* Search button */}
           <button
             onClick={() => setShowSearch((v) => !v)}
