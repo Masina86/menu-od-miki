@@ -1187,7 +1187,7 @@ export default function MenuView() {
                 src={restaurant.logo_url}
                 alt={restaurant.name}
                 style={{ height: "112px", width: "auto" }}
-                className="object-contain opacity-80"
+                className="object-contain"
               />
             ) : (
               <h2
