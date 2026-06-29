@@ -20,6 +20,9 @@ import {
   X,
   Lock,
   LogOut,
+  Eye,
+  EyeOff,
+  Info,
 } from "lucide-react";
 import { motion, AnimatePresence, Reorder } from "motion/react";
 import { Restaurant, Category, Product } from "../types";
@@ -1410,6 +1413,7 @@ export default function AdminPanel() {
     "checking" | "authenticated" | "unauthenticated"
   >("checking");
   const [adminPassword, setAdminPassword] = useState("");
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
   const [loginError, setLoginError] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
@@ -1533,7 +1537,11 @@ export default function AdminPanel() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        throw new Error(data.error || "Login failed.");
+        const message =
+          data.error === "Admin login is not configured."
+            ? "Admin login is not configured on this server. On Render, add ADMIN_PASSWORD and ADMIN_SESSION_SECRET in Environment, then save, rebuild, and deploy."
+            : data.error || "Login failed.";
+        throw new Error(message);
       }
 
       setAdminPassword("");
@@ -2059,19 +2067,43 @@ export default function AdminPanel() {
             <label className="text-[10px] uppercase tracking-widest text-stone-400 font-bold">
               Password
             </label>
-            <input
-              type="password"
-              value={adminPassword}
-              onChange={(e) => setAdminPassword(e.target.value)}
-              className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-stone-400"
-              autoFocus
-            />
+            <div className="relative">
+              <input
+                type={showAdminPassword ? "text" : "password"}
+                value={adminPassword}
+                onChange={(e) => setAdminPassword(e.target.value)}
+                className="w-full bg-stone-50 border border-stone-200 rounded-xl pl-4 pr-12 py-3 focus:outline-none focus:ring-2 focus:ring-stone-400"
+                autoFocus
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowAdminPassword((visible) => !visible)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-900 p-1 transition-colors"
+                title={showAdminPassword ? "Hide password" : "Show password"}
+                aria-label={showAdminPassword ? "Hide password" : "Show password"}
+              >
+                {showAdminPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
           {loginError && (
             <p className="text-sm text-red-500" role="alert">
               {loginError}
             </p>
           )}
+          <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-500 space-y-2">
+            <div className="flex items-start gap-2">
+              <Info size={16} className="mt-0.5 flex-shrink-0 text-stone-400" />
+              <p>
+                Local password is read from <span className="font-mono">.env.local</span>.
+                Render password is read from the Render Environment page.
+              </p>
+            </div>
+            <p>
+              For Render, set <span className="font-mono">ADMIN_PASSWORD</span> to the owner password and redeploy.
+            </p>
+          </div>
           <button
             type="submit"
             disabled={isLoggingIn}
