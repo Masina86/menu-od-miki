@@ -12,6 +12,11 @@ services:
       # Optional: enables auto-translation on create/update
       # - key: GEMINI_API_KEY
       #   sync: false
+      # Required: set these in the Render dashboard as secret values.
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: ADMIN_SESSION_SECRET
+        sync: false
       # Persistent DB location (requires a Render disk mounted at /var/data)
       - key: DB_PATH
         value: /var/data/menu.db
