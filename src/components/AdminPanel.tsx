@@ -1422,25 +1422,70 @@ export default function AdminPanel() {
   const [openingHours, setOpeningHours] = useState("");
   const [facebookUrl, setFacebookUrl] = useState("");
   const [instagramUrl, setInstagramUrl] = useState("");
-  const reorderTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  type ReorderType = "categories" | "products";
+  const reorderTimeoutsRef = React.useRef<
+    Partial<Record<ReorderType, ReturnType<typeof setTimeout>>>
+  >({});
+  const pendingReordersRef = React.useRef<Partial<Record<ReorderType, number[]>>>(
+    {},
+  );
 
-  const debouncedReorder = (type: "categories" | "products", ids: number[]) => {
-    if (reorderTimeoutRef.current) {
-      clearTimeout(reorderTimeoutRef.current);
+  const saveReorder = async (
+    type: ReorderType,
+    ids: number[],
+    keepalive = false,
+  ) => {
+    const res = await fetch(`/api/${type}/reorder`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+      keepalive,
+    });
+
+    if (!res.ok) {
+      const message = await res.text();
+      throw new Error(message || `Failed to save ${type} order`);
     }
+  };
 
-    reorderTimeoutRef.current = setTimeout(async () => {
+  const debouncedReorder = (type: ReorderType, ids: number[]) => {
+    const existingTimer = reorderTimeoutsRef.current[type];
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+    }
+    pendingReordersRef.current[type] = ids;
+
+    reorderTimeoutsRef.current[type] = setTimeout(async () => {
+      const pendingIds = pendingReordersRef.current[type];
+      if (!pendingIds) return;
+      delete pendingReordersRef.current[type];
+
       try {
-        await fetch(`/api/${type}/reorder`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ids }),
-        });
+        await saveReorder(type, pendingIds);
       } catch (error) {
         console.error(`Error reordering ${type}:`, error);
+        alert(`Could not save the new ${type} order. Please try again.`);
       }
-    }, 500);
+    }, 150);
   };
+
+  useEffect(() => {
+    const flushPendingReorders = () => {
+      (Object.entries(pendingReordersRef.current) as [ReorderType, number[]][])
+        .filter(([, ids]) => ids?.length)
+        .forEach(([type, ids]) => {
+          const timer = reorderTimeoutsRef.current[type];
+          if (timer) clearTimeout(timer);
+          void saveReorder(type, ids, true).catch((error) => {
+            console.error(`Error flushing ${type} reorder:`, error);
+          });
+        });
+      pendingReordersRef.current = {};
+    };
+
+    window.addEventListener("pagehide", flushPendingReorders);
+    return () => window.removeEventListener("pagehide", flushPendingReorders);
+  }, []);
 
   useEffect(() => {
     if (slug) {

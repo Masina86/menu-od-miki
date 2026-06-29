@@ -467,7 +467,7 @@ async function startServer() {
     }
   });
 
-  app.put("/api/categories/:id", async (req, res) => {
+  app.put("/api/categories/:id(\\d+)", async (req, res) => {
     const { name, name_en, name_bg, image_url } = req.body;
     const { id } = req.params;
 
@@ -487,7 +487,7 @@ async function startServer() {
     res.json(toJSON({ id, name: baseName, name_en: nameTr.en, name_bg: nameTr.bg, image_url: finalImage }));
   });
 
-  app.delete("/api/categories/:id", (req, res) => {
+  app.delete("/api/categories/:id(\\d+)", (req, res) => {
     db.prepare("DELETE FROM categories WHERE id = ?").run(req.params.id);
     res.json({ success: true });
   });
@@ -616,7 +616,7 @@ async function startServer() {
     }
   });
 
-  app.put("/api/products/:id", async (req, res) => {
+  app.put("/api/products/:id(\\d+)", async (req, res) => {
     try {
       const {
         name,
@@ -736,7 +736,7 @@ async function startServer() {
   });
 
   // Toggle product availability
-  app.patch("/api/products/:id/availability", (req, res) => {
+  app.patch("/api/products/:id(\\d+)/availability", (req, res) => {
     try {
       const { is_available } = req.body;
       const productId = req.params.id;
@@ -750,7 +750,7 @@ async function startServer() {
     }
   });
 
-  app.delete("/api/products/:id", (req, res) => {
+  app.delete("/api/products/:id(\\d+)", (req, res) => {
     db.prepare("DELETE FROM products WHERE id = ?").run(req.params.id);
     res.json({ success: true });
   });
