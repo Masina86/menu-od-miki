@@ -431,7 +431,7 @@ async function startServer() {
   const buildMenu = (restaurantId: string | number, compactImages = false) => {
     const allCategories = db
       .prepare(
-        "SELECT * FROM categories WHERE restaurant_id = ? ORDER BY sort_order",
+        "SELECT * FROM categories WHERE restaurant_id = ? ORDER BY sort_order, id",
       )
       .all(restaurantId) as any[];
 
@@ -441,7 +441,7 @@ async function startServer() {
           .prepare(
             `SELECT * FROM products
              WHERE category_id IN (${categoryIds.map(() => "?").join(",")})
-             ORDER BY category_id, sort_order`,
+             ORDER BY category_id, sort_order, id`,
           )
           .all(...categoryIds) as any[])
       : [];
@@ -508,7 +508,7 @@ async function startServer() {
     });
 
     const sortFn = (a: any, b: any) =>
-      (a.sort_order || 0) - (b.sort_order || 0);
+      (a.sort_order || 0) - (b.sort_order || 0) || (a.id || 0) - (b.id || 0);
     menu.sort(sortFn);
     categoryMap.forEach((cat) => {
       if (cat.subcategories && cat.subcategories.length > 0) {
@@ -643,14 +643,14 @@ async function startServer() {
 
     const allCategories = db
       .prepare(
-        "SELECT * FROM categories WHERE restaurant_id = ? ORDER BY sort_order",
+        "SELECT * FROM categories WHERE restaurant_id = ? ORDER BY sort_order, id",
       )
       .all(restaurantId) as any[];
 
     const getProductsForCategory = (categoryId: number) => {
       const products = db
         .prepare(
-          "SELECT * FROM products WHERE category_id = ? ORDER BY sort_order",
+          "SELECT * FROM products WHERE category_id = ? ORDER BY sort_order, id",
         )
         .all(categoryId) as any[];
       return products.map((prod) => {
@@ -722,7 +722,7 @@ async function startServer() {
     });
 
     const sortFn = (a: any, b: any) =>
-      (a.sort_order || 0) - (b.sort_order || 0);
+      (a.sort_order || 0) - (b.sort_order || 0) || (a.id || 0) - (b.id || 0);
     menu.sort(sortFn);
     categoryMap.forEach((cat) => {
       if (cat.subcategories && cat.subcategories.length > 0) {
@@ -1240,7 +1240,7 @@ async function startServer() {
     const delimiter = ";";
     const products = db
       .prepare(
-        "SELECT * FROM products WHERE category_id = ? ORDER BY sort_order",
+        "SELECT * FROM products WHERE category_id = ? ORDER BY sort_order, id",
       )
       .all(categoryId) as any[];
     const getAdditions = db.prepare(

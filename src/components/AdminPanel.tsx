@@ -2079,7 +2079,7 @@ export default function AdminPanel() {
               <button
                 type="button"
                 onClick={() => setShowAdminPassword((visible) => !visible)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-900 p-1 transition-colors"
+                className="absolute right-2 top-1/2 -translate-y-1/2 h-9 w-9 inline-flex items-center justify-center text-stone-400 hover:text-stone-900 transition-colors"
                 title={showAdminPassword ? "Hide password" : "Show password"}
                 aria-label={showAdminPassword ? "Hide password" : "Show password"}
               >
@@ -2092,6 +2092,20 @@ export default function AdminPanel() {
               {loginError}
             </p>
           )}
+          <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-500 space-y-2">
+            <div className="flex items-start gap-2">
+              <Info size={16} className="mt-0.5 flex-shrink-0 text-stone-400" />
+              <p>
+                Local login uses <span className="font-mono">.env.local</span>.
+                Render login uses the Render Environment variables.
+              </p>
+            </div>
+            <p>
+              For Render, set <span className="font-mono">ADMIN_PASSWORD</span>{" "}
+              and <span className="font-mono">ADMIN_SESSION_SECRET</span>, then
+              rebuild and deploy.
+            </p>
+          </div>
           <button
             type="submit"
             disabled={isLoggingIn}

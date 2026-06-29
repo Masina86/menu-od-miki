@@ -125,6 +125,31 @@ const getTagList = (tags?: string): string[] => {
     .filter(Boolean);
 };
 
+const normalizeSearchQuery = (query: string) => query.trim().toLowerCase();
+
+const productMatchesSearch = (
+  product: Product,
+  query: string,
+  language: Language,
+) =>
+  getLangValue(product, "name", language).toLowerCase().includes(query) ||
+  getLangValue(product, "description", language).toLowerCase().includes(query) ||
+  getTagList(product.tags).some((tag) => tag.toLowerCase().includes(query));
+
+const categoryMatchesSearch = (
+  category: Category,
+  query: string,
+  language: Language,
+): boolean =>
+  getLangValue(category, "name", language).toLowerCase().includes(query) ||
+  category.products.some((product) =>
+    productMatchesSearch(product, query, language),
+  ) ||
+  (category.subcategories?.some((sub) =>
+    categoryMatchesSearch(sub, query, language),
+  ) ??
+    false);
+
 // ─── Dietary Badge ───────────────────────────────────────────────────────────
 
 const DietaryBadge: React.FC<{ tag: string }> = ({ tag }) => {
@@ -203,7 +228,10 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
   return (
     <motion.div
-      layout
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.16, ease: "easeOut" }}
       className={`group flex gap-4 items-start py-4 border-b last:border-0 transition-opacity
         ${darkMode ? "border-stone-700" : "border-stone-100"}
         ${!isAvailable ? "opacity-50" : ""}`}
@@ -393,51 +421,39 @@ const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(isSubcategory);
   const name = getLangValue(category, "name", language);
+  const normalizedQuery = normalizeSearchQuery(searchQuery);
 
   // Filter products by search query
-  const filteredProducts = searchQuery
-    ? category.products.filter((p) => {
-        const q = searchQuery.toLowerCase();
-        return (
-          getLangValue(p, "name", language).toLowerCase().includes(q) ||
-          getLangValue(p, "description", language).toLowerCase().includes(q) ||
-          getTagList(p.tags).some((tag) => tag.toLowerCase().includes(q))
-        );
-      })
+  const filteredProducts = normalizedQuery
+    ? category.products.filter((p) =>
+        productMatchesSearch(p, normalizedQuery, language),
+      )
     : category.products;
 
   const filteredSubcategories =
     category.subcategories?.filter((sub) => {
-      if (!searchQuery) return true;
-      const q = searchQuery.toLowerCase();
-      return sub.products.some(
-        (p) =>
-          getLangValue(p, "name", language).toLowerCase().includes(q) ||
-          getLangValue(p, "description", language).toLowerCase().includes(q),
-      );
+      if (!normalizedQuery) return true;
+      return categoryMatchesSearch(sub, normalizedQuery, language);
     }) ?? [];
 
   // Auto-expand when searching
   useEffect(() => {
     if (
-      searchQuery &&
+      normalizedQuery &&
       (filteredProducts.length > 0 || filteredSubcategories.length > 0)
     ) {
       setIsExpanded(true);
     }
-  }, [searchQuery]);
+  }, [normalizedQuery, filteredProducts.length, filteredSubcategories.length]);
 
   const hasContent =
     filteredProducts.length > 0 || filteredSubcategories.length > 0;
-  if (searchQuery && !hasContent) return null;
+  if (normalizedQuery && !hasContent) return null;
 
   return (
     <motion.section
       id={`cat-${category.id}`}
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ delay: Math.min(idx * 0.05, 0.3) }}
+      initial={false}
       className={
         isSubcategory
           ? "ml-4 mt-4"
@@ -502,7 +518,7 @@ const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.35, ease: [0.04, 0.62, 0.23, 0.98] }}
+            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
             className="overflow-hidden"
           >
             <div className="pt-2 pb-4 space-y-0">
@@ -525,7 +541,7 @@ const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
               )}
 
               {/* Products */}
-              <AnimatePresence mode="popLayout">
+              <AnimatePresence initial={false}>
                 {filteredProducts.map((product) => (
                   <ProductCard
                     key={product.id}
@@ -569,7 +585,7 @@ const CategoryNav: React.FC<CategoryNavProps> = ({
       const top = el.getBoundingClientRect().top + window.scrollY - offset;
       window.scrollTo({ top, behavior: "smooth" });
     }
-    // Scroll the nav pill into view
+    // Keep the active title centered in the horizontal nav.
     const pill = scrollRef.current?.querySelector(`[data-cat="${id}"]`);
     pill?.scrollIntoView({
       behavior: "smooth",
@@ -586,10 +602,10 @@ const CategoryNav: React.FC<CategoryNavProps> = ({
       ${darkMode ? "bg-stone-900/90 border-stone-700" : "bg-white/90 border-stone-100"}`}
     >
       <div className="relative">
-        {/* Scrollable pills */}
+        {/* Scrollable category titles */}
         <div
           ref={scrollRef}
-          className="flex justify-center overflow-x-scroll overflow-y-hidden gap-1 px-4 py-2 scrollbar-none"
+          className="flex justify-start md:justify-center overflow-x-scroll overflow-y-hidden gap-5 px-4 py-2 scrollbar-none"
           style={
             {
               scrollbarWidth: "none",
@@ -606,7 +622,7 @@ const CategoryNav: React.FC<CategoryNavProps> = ({
                 key={cat.id}
                 data-cat={cat.id}
                 onClick={() => scrollTo(cat.id)}
-                className={`flex-shrink-0 px-4 py-1.5 border-b-2 text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap
+                className={`flex-shrink-0 bg-transparent rounded-none px-0 py-2 border-b-2 text-xs font-bold uppercase tracking-wider transition-colors whitespace-nowrap
                   ${
                     isActive
                       ? darkMode
@@ -642,7 +658,7 @@ export default function MenuView() {
   const [showWifi, setShowWifi] = useState(false);
   const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
-  const [isScrolled, setIsScrolled] = useState(false);
+  const [isAtTop, setIsAtTop] = useState(true);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
@@ -663,9 +679,15 @@ export default function MenuView() {
   // Scroll detection
   useEffect(() => {
     const onScroll = () => {
+      const atTop = window.scrollY <= 12;
       setShowBackToTop(window.scrollY > 350);
-      setIsScrolled(window.scrollY > 50);
+      setIsAtTop(atTop);
+      if (!atTop) {
+        setShowSearch(false);
+        setShowWifi(false);
+      }
     };
+    onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
@@ -704,22 +726,7 @@ export default function MenuView() {
       if (!res.ok) throw new Error(`Failed to load menu (${res.status})`);
       const data = await res.json();
       setRestaurant(data.restaurant);
-      
-      const sortedMenu = (data.menu || []).sort((a: Category, b: Category) => (a.sort_order || 0) - (b.sort_order || 0));
-      sortedMenu.forEach((cat: Category) => {
-        if (cat.products) {
-          cat.products.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-        }
-        if (cat.subcategories) {
-          cat.subcategories.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-          cat.subcategories.forEach(sub => {
-            if (sub.products) {
-              sub.products.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-            }
-          });
-        }
-      });
-      setMenu(sortedMenu);
+      setMenu(data.menu || []);
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -777,6 +784,12 @@ export default function MenuView() {
   const bg = darkMode
     ? "bg-stone-900 text-stone-100"
     : "bg-[#fcfbf7] text-stone-900";
+  const normalizedSearchQuery = normalizeSearchQuery(searchQuery);
+  const hasSearchResults =
+    !normalizedSearchQuery ||
+    menu.some((cat) =>
+      categoryMatchesSearch(cat, normalizedSearchQuery, language),
+    );
 
   return (
     <div
@@ -786,7 +799,9 @@ export default function MenuView() {
         {/* ── Top-left: Admin + Dark Mode + WiFi */}
         <div
           className={`fixed top-4 left-4 z-50 flex items-center gap-2 transition-all duration-300 ${
-            isScrolled ? "-translate-y-[150%] opacity-0 pointer-events-none" : "translate-y-0 opacity-100"
+            isAtTop
+              ? "translate-y-0 opacity-100"
+              : "-translate-y-[150%] opacity-0 pointer-events-none md:translate-y-0 md:opacity-100 md:pointer-events-auto"
           }`}
         >
           {isAdminAuthenticated && (
@@ -884,7 +899,9 @@ export default function MenuView() {
         {/* ── Top-right: Search + Language */}
         <div
           className={`fixed top-4 right-4 z-50 flex items-center gap-2 transition-all duration-300 ${
-            isScrolled ? "-translate-y-[150%] opacity-0 pointer-events-none" : "translate-y-0 opacity-100"
+            isAtTop
+              ? "translate-y-0 opacity-100"
+              : "-translate-y-[150%] opacity-0 pointer-events-none md:translate-y-0 md:opacity-100 md:pointer-events-auto"
           }`}
         >
           {/* Search button */}
@@ -1181,30 +1198,7 @@ export default function MenuView() {
                 {t("updated", language)}
               </p>
             </div>
-          ) : searchQuery &&
-            !menu.some((cat) => {
-              const q = searchQuery.toLowerCase();
-              const catHas = cat.products.some(
-                (p) =>
-                  getLangValue(p, "name", language).toLowerCase().includes(q) ||
-                  getLangValue(p, "description", language)
-                    .toLowerCase()
-                    .includes(q),
-              );
-              const subHas =
-                cat.subcategories?.some((sub) =>
-                  sub.products.some(
-                    (p) =>
-                      getLangValue(p, "name", language)
-                        .toLowerCase()
-                        .includes(q) ||
-                      getLangValue(p, "description", language)
-                        .toLowerCase()
-                        .includes(q),
-                  ),
-                ) ?? false;
-              return catHas || subHas;
-            }) ? (
+          ) : normalizedSearchQuery && !hasSearchResults ? (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
