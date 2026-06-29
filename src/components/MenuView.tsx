@@ -220,6 +220,8 @@ const ProductCard: React.FC<ProductCardProps> = ({
           <img
             src={product.image_url}
             alt={name}
+            loading="lazy"
+            decoding="async"
             className={`w-full h-full object-cover rounded-2xl border shadow-sm transition-all
               ${darkMode ? "border-stone-700" : "border-stone-100"}
               ${!isAvailable ? "grayscale" : "group-hover:scale-105"}`}
@@ -456,6 +458,8 @@ const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
             <img
               src={category.image_url}
               alt=""
+              loading="lazy"
+              decoding="async"
               className={`${isSubcategory ? "w-7 h-7" : "w-10 h-10"} rounded-full object-cover border shadow-sm flex-shrink-0
                 ${darkMode ? "border-stone-600" : "border-stone-200"}`}
             />
@@ -465,6 +469,8 @@ const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
               <img
                 src={category.products.find((p) => p.image_url)?.image_url}
                 alt=""
+                loading="lazy"
+                decoding="async"
                 className={`w-10 h-10 rounded-full object-cover border shadow-sm flex-shrink-0
                   ${darkMode ? "border-stone-600" : "border-stone-200"}`}
               />
@@ -692,12 +698,11 @@ export default function MenuView() {
   const fetchData = useCallback(async () => {
     if (!slug) return;
     try {
-      const resRest = await fetch(`/api/restaurant/${slug}`);
-      const rest = await resRest.json();
-      setRestaurant(rest);
-      const resMenu = await fetch(`/api/menu/${rest.id}`);
-      const menuData = await resMenu.json();
-      setMenu(menuData);
+      const res = await fetch(`/api/public-menu/${slug}`);
+      if (!res.ok) throw new Error(`Failed to load menu (${res.status})`);
+      const data = await res.json();
+      setRestaurant(data.restaurant);
+      setMenu(data.menu);
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -978,18 +983,27 @@ export default function MenuView() {
               <img
                 src={restaurant.background_url}
                 alt={restaurant.name}
+                loading="eager"
+                decoding="async"
+                fetchPriority="high"
                 className="w-full h-full object-cover"
               />
             ) : restaurant.logo_url ? (
               <img
                 src={restaurant.logo_url}
                 alt={restaurant.name}
+                loading="eager"
+                decoding="async"
+                fetchPriority="high"
                 className="w-full h-full object-cover opacity-20 grayscale"
               />
             ) : (
               <img
                 src={`https://picsum.photos/seed/${restaurant.slug}/1200/600?blur=2`}
                 alt="Background"
+                loading="eager"
+                decoding="async"
+                fetchPriority="high"
                 className="w-full h-full object-cover opacity-15 grayscale"
                 referrerPolicy="no-referrer"
               />
@@ -1009,6 +1023,8 @@ export default function MenuView() {
               <img
                 src={restaurant.logo_url}
                 alt={restaurant.name}
+                loading="eager"
+                decoding="async"
                 className="mx-auto object-contain mb-6 drop-shadow-2xl"
                 style={{ height: "clamp(120px, 14vh, 200px)", width: "auto" }}
               />
@@ -1186,6 +1202,8 @@ export default function MenuView() {
               <img
                 src={restaurant.logo_url}
                 alt={restaurant.name}
+                loading="lazy"
+                decoding="async"
                 style={{ height: "112px", width: "auto" }}
                 className="object-contain"
               />

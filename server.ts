@@ -136,6 +136,15 @@ tryAlter("ALTER TABLE additions ADD COLUMN name_en TEXT");
 tryAlter("ALTER TABLE additions ADD COLUMN name_bg TEXT");
 
 db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_categories_restaurant_order
+    ON categories (restaurant_id, parent_id, sort_order);
+  CREATE INDEX IF NOT EXISTS idx_products_category_order
+    ON products (category_id, sort_order);
+  CREATE INDEX IF NOT EXISTS idx_additions_product
+    ON additions (product_id);
+`);
+
+db.exec(`
   CREATE TABLE IF NOT EXISTS reviews (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     restaurant_id INTEGER NOT NULL,
@@ -215,11 +224,50 @@ async function startServer() {
     );
   };
 
-  // ─── RESTAURANT ────────────────────────────────────────────────────────────
+  const dataUrlToResponse = (imageUrl: string | null | undefined, res: any) => {
+    if (!imageUrl) {
+      res.status(404).end();
+      return;
+    }
 
-  // Get or create restaurant by slug
-  app.get("/api/restaurant/:slug", (req, res) => {
-    const { slug } = req.params;
+    if (!imageUrl.startsWith("data:")) {
+      res.redirect(imageUrl);
+      return;
+    }
+
+    const match = imageUrl.match(/^data:([^;,]+)?(;base64)?,(.*)$/s);
+    if (!match) {
+      res.status(404).end();
+      return;
+    }
+
+    const contentType = match[1] || "application/octet-stream";
+    const isBase64 = !!match[2];
+    const raw = match[3] || "";
+    const body = isBase64
+      ? Buffer.from(raw, "base64")
+      : Buffer.from(decodeURIComponent(raw));
+
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    res.send(body);
+  };
+
+  const compactImageUrl = (
+    type: "categories" | "products" | "restaurants",
+    id: number,
+    imageUrl: string | null | undefined,
+    field = "image",
+  ) => {
+    if (!imageUrl) return imageUrl;
+    if (!imageUrl.startsWith("data:") || imageUrl.length < 2048) return imageUrl;
+    if (type === "categories" && imageUrl.length > 500_000) return null;
+    return type === "restaurants"
+      ? `/api/images/restaurants/${id}/${field}`
+      : `/api/images/${type}/${id}`;
+  };
+
+  const getOrCreateRestaurantBySlug = (slug: string) => {
     let restaurant = db
       .prepare("SELECT * FROM restaurants WHERE slug = ?")
       .get(slug) as any;
@@ -248,6 +296,107 @@ async function startServer() {
         instagram_url: null,
       };
     }
+
+    return restaurant;
+  };
+
+  const buildMenu = (restaurantId: string | number, compactImages = false) => {
+    const allCategories = db
+      .prepare(
+        "SELECT * FROM categories WHERE restaurant_id = ? ORDER BY sort_order",
+      )
+      .all(restaurantId) as any[];
+
+    const categoryIds = allCategories.map((cat) => cat.id);
+    const products = categoryIds.length
+      ? (db
+          .prepare(
+            `SELECT * FROM products
+             WHERE category_id IN (${categoryIds.map(() => "?").join(",")})
+             ORDER BY category_id, sort_order`,
+          )
+          .all(...categoryIds) as any[])
+      : [];
+
+    const productIds = products.map((prod) => prod.id);
+    const additions = productIds.length
+      ? (db
+          .prepare(
+            `SELECT * FROM additions
+             WHERE product_id IN (${productIds.map(() => "?").join(",")})
+             ORDER BY product_id, id`,
+          )
+          .all(...productIds) as any[])
+      : [];
+
+    const additionsByProduct = new Map<number, any[]>();
+    additions.forEach((addition) => {
+      const list = additionsByProduct.get(addition.product_id) || [];
+      list.push(addition);
+      additionsByProduct.set(addition.product_id, list);
+    });
+
+    const productsByCategory = new Map<number, any[]>();
+    products.forEach((product) => {
+      const productWithData = {
+        ...product,
+        image_url: compactImages
+          ? compactImageUrl("products", product.id, product.image_url)
+          : product.image_url,
+        additions: additionsByProduct.get(product.id) || [],
+      };
+      const list = productsByCategory.get(product.category_id) || [];
+      list.push(productWithData);
+      productsByCategory.set(product.category_id, list);
+    });
+
+    const categoryMap = new Map();
+    allCategories.forEach((cat) => {
+      const catProducts = productsByCategory.get(cat.id) || [];
+
+      categoryMap.set(cat.id, {
+        ...cat,
+        image_url: compactImages
+          ? compactImageUrl("categories", cat.id, cat.image_url)
+          : cat.image_url,
+        products: catProducts,
+        subcategories: [],
+      });
+    });
+
+    const menu: any[] = [];
+    allCategories.forEach((cat) => {
+      const categoryWithData = categoryMap.get(cat.id);
+      if (cat.parent_id) {
+        const parent = categoryMap.get(cat.parent_id);
+        if (parent) {
+          parent.subcategories.push(categoryWithData);
+        } else {
+          menu.push(categoryWithData);
+        }
+      } else {
+        menu.push(categoryWithData);
+      }
+    });
+
+    const sortFn = (a: any, b: any) =>
+      (a.sort_order || 0) - (b.sort_order || 0);
+    menu.sort(sortFn);
+    categoryMap.forEach((cat) => {
+      if (cat.subcategories && cat.subcategories.length > 0) {
+        cat.subcategories.sort(sortFn);
+      }
+    });
+
+    return menu;
+  };
+
+  // ─── RESTAURANT ────────────────────────────────────────────────────────────
+
+  // Get or create restaurant by slug
+  app.get("/api/restaurant/:slug", (req, res) => {
+    const { slug } = req.params;
+    const restaurant = getOrCreateRestaurantBySlug(slug);
 
     res.json(toJSON(restaurant));
   });
@@ -312,6 +461,54 @@ async function startServer() {
   });
 
   // ─── MENU ──────────────────────────────────────────────────────────────────
+
+  app.get("/api/public-menu/:slug", (req, res) => {
+    const restaurant = getOrCreateRestaurantBySlug(req.params.slug);
+    const publicRestaurant = {
+      ...restaurant,
+      background_url: compactImageUrl(
+        "restaurants",
+        restaurant.id,
+        restaurant.background_url,
+        "background",
+      ),
+      logo_url: compactImageUrl(
+        "restaurants",
+        restaurant.id,
+        restaurant.logo_url,
+        "logo",
+      ),
+    };
+    const menu = buildMenu(restaurant.id, true);
+    res.setHeader(
+      "Cache-Control",
+      "public, max-age=30, stale-while-revalidate=300",
+    );
+    res.json(toJSON({ restaurant: publicRestaurant, menu }));
+  });
+
+  app.get("/api/images/categories/:id", (req, res) => {
+    const row = db
+      .prepare("SELECT image_url FROM categories WHERE id = ?")
+      .get(req.params.id) as any;
+    dataUrlToResponse(row?.image_url, res);
+  });
+
+  app.get("/api/images/products/:id", (req, res) => {
+    const row = db
+      .prepare("SELECT image_url FROM products WHERE id = ?")
+      .get(req.params.id) as any;
+    dataUrlToResponse(row?.image_url, res);
+  });
+
+  app.get("/api/images/restaurants/:id/:field", (req, res) => {
+    const field =
+      req.params.field === "background" ? "background_url" : "logo_url";
+    const row = db
+      .prepare(`SELECT ${field} AS image_url FROM restaurants WHERE id = ?`)
+      .get(req.params.id) as any;
+    dataUrlToResponse(row?.image_url, res);
+  });
 
   app.get("/api/menu/:restaurantId", (req, res) => {
     const { restaurantId } = req.params;
