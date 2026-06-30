@@ -501,6 +501,12 @@ const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
       if (!normalizedQuery) return true;
       return categoryMatchesSearch(sub, normalizedQuery, language);
     }) ?? [];
+  const totalProducts =
+    category.products.length +
+    (category.subcategories || []).reduce(
+      (total, sub) => total + (sub.products?.length || 0),
+      0,
+    );
 
   // Auto-expand when searching
   useEffect(() => {
@@ -531,25 +537,34 @@ const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
         type="button"
         aria-expanded={isExpanded}
         aria-controls={`cat-body-${category.id}`}
-        className={`w-full text-left flex items-center justify-between gap-3 py-3 cursor-pointer group
-          ${isSubcategory ? `border-l-2 pl-4 ${darkMode ? "border-stone-600" : "border-stone-200"}` : ""}`}
+        className={`w-full text-left flex items-center justify-between gap-3 cursor-pointer group
+          ${
+            isSubcategory
+              ? `border-l-2 pl-4 py-2.5 ${darkMode ? "border-stone-600" : "border-stone-200"}`
+              : "py-3"
+          }`}
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center gap-3 flex-1 min-w-0">
           {categoryThumbSrc ? (
-            <img
-              src={categoryThumbSrc}
-              alt=""
-              loading="lazy"
-              decoding="async"
-              onError={() => setCategoryImageFailed(true)}
-              className={`${isSubcategory ? "w-7 h-7" : "w-10 h-10"} rounded-full object-cover border shadow-sm flex-shrink-0
-                ${darkMode ? "border-stone-600" : "border-stone-200"}`}
-            />
+            <span
+              className={`relative flex-shrink-0 rounded-full p-0.5 shadow-sm ${
+                darkMode ? "bg-white ring-1 ring-white/10" : "bg-white ring-1 ring-stone-200"
+              }`}
+            >
+              <img
+                src={categoryThumbSrc}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                onError={() => setCategoryImageFailed(true)}
+                className={`${isSubcategory ? "w-7 h-7" : "w-12 h-12"} rounded-full object-cover border-2 border-white`}
+              />
+            </span>
           ) : !isSubcategory ? (
             <span
-              className={`w-10 h-10 rounded-full border flex-shrink-0 inline-flex items-center justify-center text-xs font-bold
-                ${darkMode ? "bg-stone-800 border-stone-700 text-stone-500" : "bg-stone-100 border-stone-200 text-stone-400"}`}
+              className={`w-12 h-12 rounded-full border-2 border-white flex-shrink-0 inline-flex items-center justify-center text-sm font-bold shadow-sm
+                ${darkMode ? "bg-stone-800 text-stone-500 ring-1 ring-white/10" : "bg-stone-100 text-stone-400 ring-1 ring-stone-200"}`}
               aria-hidden="true"
             >
               {name.slice(0, 1).toUpperCase()}
@@ -570,10 +585,15 @@ const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
           >
             {name}
           </h2>
-          <div
-            className={`h-px flex-1 ${darkMode ? "bg-stone-700 group-hover:bg-stone-600" : "bg-stone-100 group-hover:bg-stone-200"} transition-colors`}
-          />
         </div>
+        {!isSubcategory && totalProducts > 0 && (
+          <span
+            className={`hidden min-[380px]:inline-flex flex-shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider
+              ${darkMode ? "border-stone-700 bg-stone-800/60 text-stone-400" : "border-stone-200 bg-stone-50 text-stone-500"}`}
+          >
+            {totalProducts}
+          </span>
+        )}
         <div
           className={`transition-colors flex-shrink-0 ${darkMode ? "text-stone-500 group-hover:text-stone-200" : "text-stone-300 group-hover:text-stone-900"}`}
         >
