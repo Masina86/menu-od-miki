@@ -26,6 +26,7 @@ import {
 import { motion, AnimatePresence, Reorder } from "motion/react";
 import { Restaurant, Category, Product } from "../types";
 import { ImageModal } from "./ImageModal";
+import { AllergenPicker } from "./AllergenIcons";
 import { ApiError, apiRequest, jsonRequest } from "../utils/api";
 
 type NoticeType = "info" | "success" | "error";
@@ -1241,20 +1242,14 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                           }
                         />
                       </div>
-                      <div className="space-y-1">
+                      <div className="space-y-1 col-span-full">
                         <label className="text-[10px] text-stone-400 font-bold ml-1 uppercase">
-                          Allergens (comma-separated)
+                          Allergens
                         </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. gluten, nuts, dairy"
-                          className="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-stone-400 focus:outline-none"
+                        <AllergenPicker
                           value={newProd.allergens}
-                          onChange={(e) =>
-                            setNewProd({
-                              ...newProd,
-                              allergens: e.target.value,
-                            })
+                          onChange={(val) =>
+                            setNewProd({ ...newProd, allergens: val })
                           }
                         />
                       </div>

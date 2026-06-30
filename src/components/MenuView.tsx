@@ -11,6 +11,7 @@ import {
   ALLERGEN_LABELS,
 } from "../types";
 import { ImageModal } from "./ImageModal";
+import { AllergenBadge } from "./AllergenIcons";
 import {
   Maximize2,
   Settings,
@@ -441,20 +442,19 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
         {/* Allergens */}
         {allergens.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1 mt-2">
+          <div className="flex flex-wrap items-center gap-1.5 mt-2">
             <span
               className={`text-[9px] uppercase tracking-widest font-bold mr-1 ${darkMode ? "text-stone-500" : "text-stone-400"}`}
             >
               {t("allergens", language)}:
             </span>
             {allergens.map((a) => (
-              <span
+              <AllergenBadge
                 key={a}
-                title={ALLERGEN_LABELS[a]?.[language] || a}
-                className="text-base leading-none cursor-help"
-              >
-                {ALLERGEN_ICONS[a]}
-              </span>
+                allergenKey={a}
+                label={ALLERGEN_LABELS[a]?.[language] || a}
+                size={26}
+              />
             ))}
           </div>
         )}
