@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -105,6 +105,38 @@ const isMissingTranslation = (obj: any, field: string, lang: Language) => {
   const translatedOk = translated && String(translated).trim() !== "";
   const baseOk = obj[field] && String(obj[field]).trim() !== "";
   return baseOk && !translatedOk;
+};
+
+const hasText = (value?: string | null) => !!value && String(value).trim() !== "";
+
+const hasMenuContentForLanguage = (
+  categories: Category[],
+  lang: Exclude<Language, "MK">,
+): boolean => {
+  const suffix = lang === "EN" ? "_en" : "_bg";
+
+  const categoryHasText = (category: Category): boolean => {
+    if (hasText(category[`name${suffix}` as keyof Category] as string)) {
+      return true;
+    }
+
+    const productHasText = category.products.some((product) => {
+      if (
+        hasText(product[`name${suffix}` as keyof Product] as string) ||
+        hasText(product[`description${suffix}` as keyof Product] as string)
+      ) {
+        return true;
+      }
+
+      return (product.additions || []).some((addition) =>
+        hasText(addition[`name${suffix}` as keyof typeof addition] as string),
+      );
+    });
+
+    return productHasText || (category.subcategories || []).some(categoryHasText);
+  };
+
+  return categories.some(categoryHasText);
 };
 
 const getAllergenList = (allergens?: string): AllergenKey[] => {
@@ -830,6 +862,19 @@ export default function MenuView() {
     fetchData();
   }, [fetchData]);
 
+  const availableLanguages = useMemo<Language[]>(() => {
+    const languages: Language[] = ["MK"];
+    if (hasMenuContentForLanguage(menu, "BG")) languages.push("BG");
+    if (hasMenuContentForLanguage(menu, "EN")) languages.push("EN");
+    return languages;
+  }, [menu]);
+
+  useEffect(() => {
+    if (!availableLanguages.includes(language)) {
+      setLanguage("MK");
+    }
+  }, [availableLanguages, language]);
+
   useEffect(() => {
     const checkAdminSession = async () => {
       try {
@@ -1007,6 +1052,8 @@ export default function MenuView() {
         {/* ── Top-right: Search + Language */}
         <div
           className={`fixed top-4 right-4 z-50 flex items-center gap-2 transition-all duration-300 ${
+            availableLanguages.length > 1 ? "" : "hidden"
+          } ${
             isAtTop
               ? "translate-y-0 opacity-100"
               : "-translate-y-[150%] opacity-0 pointer-events-none md:translate-y-0 md:opacity-100 md:pointer-events-auto"
@@ -1017,7 +1064,7 @@ export default function MenuView() {
             className={`rounded-full p-1 shadow-sm border backdrop-blur-md flex items-center gap-0.5
             ${darkMode ? "bg-stone-800/90 border-stone-700" : "bg-white/80 border-stone-200"}`}
           >
-            {(["MK", "BG", "EN"] as const).map((l) => (
+            {availableLanguages.map((l) => (
               <button
                 key={l}
                 onClick={() => setLanguage(l)}
