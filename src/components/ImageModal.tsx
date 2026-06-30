@@ -132,24 +132,27 @@ export const ImageModal: React.FC<ImageModalProps> = ({
   return (
     <AnimatePresence>
       {isOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8 overflow-y-auto"
-        >
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 bg-stone-900/50 backdrop-blur-xl cursor-zoom-out"
+        <>
+          {/* Backdrop – instant blur on open */}
+          <motion.div
+            key="backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.08 }}
+            className="fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-xl cursor-zoom-out"
             onClick={onClose}
           />
 
+          {/* Modal card – spring slide-in */}
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8 overflow-y-auto pointer-events-none">
           <motion.div
+            key="card"
             initial={{ scale: 0.92, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.92, opacity: 0, y: 20 }}
             transition={{ type: "spring", stiffness: 300, damping: 28 }}
-            className={`relative w-full max-w-4xl rounded-[2rem] shadow-2xl overflow-hidden flex flex-col md:flex-row min-h-[460px] ${panelBg}`}
+            className={`relative w-full max-w-4xl rounded-[2rem] shadow-2xl overflow-hidden flex flex-col md:flex-row min-h-[460px] pointer-events-auto ${panelBg}`}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Close Button */}
@@ -380,7 +383,8 @@ export const ImageModal: React.FC<ImageModalProps> = ({
               </div>
             </div>
           </motion.div>
-        </motion.div>
+          </div>
+        </>
       )}
     </AnimatePresence>
   );
