@@ -793,6 +793,27 @@ const CategoryNav: React.FC<CategoryNavProps> = ({
 
 // ─── Main MenuView ────────────────────────────────────────────────────────────
 
+const heroContainerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.15,
+      delayChildren: 0.1,
+    }
+  }
+};
+
+const heroItemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+};
+
+const heroLogoVariants = {
+  hidden: { opacity: 0, scale: 0.85 },
+  show: { opacity: 1, scale: 1, transition: { type: "spring", stiffness: 300, damping: 20 } }
+};
+
 export default function MenuView() {
   const { slug } = useParams<{ slug: string }>();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
@@ -1178,12 +1199,14 @@ export default function MenuView() {
           </div>
 
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
+            variants={heroContainerVariants}
+            initial="hidden"
+            animate="show"
             className="relative z-10 text-center px-4 pb-10"
           >
             {restaurant.logo_url ? (
-              <img
+              <motion.img
+                variants={heroLogoVariants}
                 src={restaurant.logo_url}
                 alt={restaurant.name}
                 loading="eager"
@@ -1192,21 +1215,24 @@ export default function MenuView() {
                 style={heroLogoStyle}
               />
             ) : (
-              <p
+              <motion.p
+                variants={heroItemVariants}
                 className={`text-[10px] uppercase tracking-[0.35em] mb-3 font-medium
                 ${darkMode || restaurant.background_url ? "text-stone-300" : "text-stone-500"}`}
               >
                 {t("welcome", language)}
-              </p>
+              </motion.p>
             )}
-            <h1
+            <motion.h1
+              variants={heroItemVariants}
               className={`text-4xl md:text-6xl font-serif mb-2
               ${darkMode || restaurant.background_url ? "text-stone-100" : "text-stone-900"}`}
             >
               {restaurant.name}
-            </h1>
+            </motion.h1>
             {hasInfo && (
-              <div
+              <motion.div
+                variants={heroItemVariants}
                 className={`flex flex-wrap items-center justify-center gap-3 mt-4
                 ${darkMode || restaurant.background_url ? "text-stone-400" : "text-stone-400"}`}
                 style={{ fontSize: "17px" }}
@@ -1238,10 +1264,10 @@ export default function MenuView() {
                     {restaurant.opening_hours}
                   </span>
                 )}
-              </div>
+              </motion.div>
             )}
             {hasSocial && (
-              <div className="flex items-center justify-center gap-4 mt-4">
+              <motion.div variants={heroItemVariants} className="flex items-center justify-center gap-4 mt-4">
                 {restaurant.facebook_url && (
                   <a
                     href={restaurant.facebook_url}
@@ -1280,9 +1306,10 @@ export default function MenuView() {
                     </svg>
                   </a>
                 )}
-              </div>
+              </motion.div>
             )}
-            <div
+            <motion.div
+              variants={heroItemVariants}
               className={`w-10 h-px mx-auto mt-6 ${darkMode || restaurant.background_url ? "bg-stone-500" : "bg-stone-300"}`}
             />
           </motion.div>
