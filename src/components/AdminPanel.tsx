@@ -2285,6 +2285,8 @@ export default function AdminPanel() {
       };
       reader.readAsDataURL(file);
     }
+    // Reset so re-selecting the same file fires onChange again
+    e.target.value = "";
   };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2296,6 +2298,8 @@ export default function AdminPanel() {
       };
       reader.readAsDataURL(file);
     }
+    // Reset so re-selecting the same file fires onChange again
+    e.target.value = "";
   };
 
   const adminStats = useMemo(() => {
@@ -2512,7 +2516,7 @@ export default function AdminPanel() {
                       Logo
                     </label>
                     <div className="flex items-center gap-4">
-                      <div className="relative group overflow-hidden bg-stone-100 rounded-xl border-2 border-dashed border-stone-200 w-32 h-20 flex items-center justify-center">
+                      <div className="relative group bg-stone-100 rounded-xl border-2 border-dashed border-stone-200 w-32 h-20 flex items-center justify-center overflow-hidden">
                         {logoUrl ? (
                           <>
                             <img
@@ -2520,22 +2524,41 @@ export default function AdminPanel() {
                               alt="Logo Preview"
                               className="w-full h-full object-contain"
                             />
+                            {/* Delete button — no file input behind it */}
                             <button
-                              onClick={() => setLogoUrl("")}
-                              className="absolute top-1 right-1 bg-white/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setLogoUrl(""); }}
+                              className="absolute top-1 right-1 bg-white/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                              title="Remove logo"
                             >
                               <X size={14} />
                             </button>
+                            {/* Change-image label (bottom strip) */}
+                            <label
+                              className="absolute bottom-0 inset-x-0 text-center text-[9px] font-semibold bg-black/40 text-white py-0.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                              title="Change logo"
+                            >
+                              Change
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={handleLogoUpload}
+                              />
+                            </label>
                           </>
                         ) : (
-                          <ImageIcon className="text-stone-300" size={24} />
+                          <>
+                            <ImageIcon className="text-stone-300" size={24} />
+                            {/* File input only covers the empty state area */}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="absolute inset-0 opacity-0 cursor-pointer"
+                              onChange={handleLogoUpload}
+                            />
+                          </>
                         )}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="absolute inset-0 opacity-0 cursor-pointer"
-                          onChange={handleLogoUpload}
-                        />
                       </div>
                       <div className="flex-1">
                         <input
@@ -2556,7 +2579,7 @@ export default function AdminPanel() {
                       Hero Background Image
                     </label>
                     <div className="flex items-center gap-4">
-                      <div className="relative group overflow-hidden bg-stone-100 rounded-xl border-2 border-dashed border-stone-200 w-32 h-20 flex items-center justify-center">
+                      <div className="relative group bg-stone-100 rounded-xl border-2 border-dashed border-stone-200 w-32 h-20 flex items-center justify-center overflow-hidden">
                         {backgroundUrl ? (
                           <>
                             <img
@@ -2564,22 +2587,41 @@ export default function AdminPanel() {
                               alt="Background Preview"
                               className="w-full h-full object-cover"
                             />
+                            {/* Delete button — no file input behind it */}
                             <button
-                              onClick={() => setBackgroundUrl("")}
-                              className="absolute top-1 right-1 bg-white/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setBackgroundUrl(""); }}
+                              className="absolute top-1 right-1 bg-white/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                              title="Remove background"
                             >
                               <X size={14} />
                             </button>
+                            {/* Change-image label (bottom strip) */}
+                            <label
+                              className="absolute bottom-0 inset-x-0 text-center text-[9px] font-semibold bg-black/40 text-white py-0.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                              title="Change background"
+                            >
+                              Change
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={handleBackgroundUpload}
+                              />
+                            </label>
                           </>
                         ) : (
-                          <ImageIcon className="text-stone-300" size={24} />
+                          <>
+                            <ImageIcon className="text-stone-300" size={24} />
+                            {/* File input only covers the empty state area */}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="absolute inset-0 opacity-0 cursor-pointer"
+                              onChange={handleBackgroundUpload}
+                            />
+                          </>
                         )}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="absolute inset-0 opacity-0 cursor-pointer"
-                          onChange={handleBackgroundUpload}
-                        />
                       </div>
                       <div className="flex-1">
                         <input
