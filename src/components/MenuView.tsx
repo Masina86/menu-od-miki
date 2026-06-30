@@ -678,14 +678,14 @@ const CategoryNav: React.FC<CategoryNavProps> = ({
 
   return (
     <div
-      className={`sticky top-0 z-40 border-b backdrop-blur-xl shadow-sm
+      className={`sticky top-0 z-40 border-b backdrop-blur-xl
       ${darkMode ? "bg-stone-900/90 border-stone-700" : "bg-white/90 border-stone-100"}`}
     >
       <div className="relative">
         {/* Scrollable category titles */}
         <div
           ref={scrollRef}
-          className="flex justify-start md:justify-center overflow-x-scroll overflow-y-hidden gap-2 px-3 py-2 scrollbar-none"
+          className="flex justify-start md:justify-center overflow-x-scroll overflow-y-hidden gap-1.5 md:gap-2 px-2.5 md:px-3 py-1.5 md:py-2 scrollbar-none"
           style={
             {
               scrollbarWidth: "none",
@@ -705,7 +705,7 @@ const CategoryNav: React.FC<CategoryNavProps> = ({
                 onClick={() => scrollTo(cat.id)}
                 aria-current={isActive ? "true" : undefined}
                 title={getLangValue(cat, "name", language)}
-                className={`min-h-11 flex-shrink-0 rounded-full px-4 py-2 border text-xs font-bold uppercase tracking-wider transition-colors whitespace-nowrap
+                className={`min-h-8 md:min-h-11 flex-shrink-0 rounded-full px-3 md:px-4 py-1 md:py-2 border text-[10px] md:text-xs font-bold uppercase tracking-wide md:tracking-wider transition-colors whitespace-nowrap
                   ${
                     isActive
                       ? darkMode
