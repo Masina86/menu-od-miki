@@ -17,8 +17,6 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronUp,
-  Search,
-  X,
   Wifi,
   Phone,
   MapPin,
@@ -279,46 +277,49 @@ const ProductCard: React.FC<ProductCardProps> = ({
       <div
         className={`relative shrink-0 ${isSubcategory ? "w-14 h-14" : "w-20 h-20 md:w-24 md:h-24"}`}
       >
-      {product.image_url && !imageFailed ? (
-        <div
-          className="relative w-full h-full cursor-zoom-in"
-          onClick={() => isAvailable && onSelect(product)}
-        >
-          <img
-            src={product.image_url}
-            alt={name}
-            loading="lazy"
-            decoding="async"
-            onError={() => setImageFailed(true)}
-            className={`w-full h-full object-cover rounded-2xl border shadow-sm transition-all
-              ${darkMode ? "border-stone-700" : "border-stone-100"}
-              ${!isAvailable ? "grayscale" : "group-hover:scale-105"}`}
-          />
-          {!isAvailable && (
-            <div className="absolute inset-0 rounded-2xl bg-black/30 flex items-center justify-center">
-              <span className="text-white text-[8px] font-bold uppercase tracking-wider text-center px-1">
-                {t("sold_out", language)}
-              </span>
-            </div>
-          )}
-          {isAvailable && (
-            <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center">
-              <Maximize2 size={16} className="text-white" />
-            </div>
-          )}
-        </div>
-      ) : (
-        <div
-          className={`w-full h-full rounded-2xl border flex items-center justify-center ${
-            darkMode
-              ? "bg-stone-800 border-stone-700 text-stone-600"
-              : "bg-stone-100 border-stone-200 text-stone-300"
-          }`}
-          aria-hidden="true"
-        >
-          <Sparkles size={18} />
-        </div>
-      )}
+        {product.image_url && !imageFailed ? (
+          <button
+            type="button"
+            className="relative w-full h-full cursor-zoom-in text-left"
+            onClick={() => isAvailable && onSelect(product)}
+            disabled={!isAvailable}
+            aria-label={`Open ${name}`}
+          >
+            <img
+              src={product.image_url}
+              alt={name}
+              loading="lazy"
+              decoding="async"
+              onError={() => setImageFailed(true)}
+              className={`w-full h-full object-cover rounded-2xl border shadow-sm transition-all
+                ${darkMode ? "border-stone-700" : "border-stone-100"}
+                ${!isAvailable ? "grayscale" : "group-hover:scale-105"}`}
+            />
+            {!isAvailable && (
+              <div className="absolute inset-0 rounded-2xl bg-black/30 flex items-center justify-center">
+                <span className="text-white text-[8px] font-bold uppercase tracking-wider text-center px-1">
+                  {t("sold_out", language)}
+                </span>
+              </div>
+            )}
+            {isAvailable && (
+              <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center">
+                <Maximize2 size={16} className="text-white" />
+              </div>
+            )}
+          </button>
+        ) : (
+          <div
+            className={`w-full h-full rounded-2xl border flex items-center justify-center ${
+              darkMode
+                ? "bg-stone-800 border-stone-700 text-stone-600"
+                : "bg-stone-100 border-stone-200 text-stone-300"
+            }`}
+            aria-hidden="true"
+          >
+            <Sparkles size={18} />
+          </div>
+        )}
       </div>
 
       {/* Content */}
@@ -345,9 +346,12 @@ const ProductCard: React.FC<ProductCardProps> = ({
         )}
 
         {/* Name + Price */}
-        <div
-          className={`flex justify-between items-baseline gap-2 mb-1 cursor-pointer ${isAvailable ? "cursor-pointer" : "cursor-default"}`}
+        <button
+          type="button"
+          disabled={!isAvailable}
+          className={`w-full flex justify-between items-baseline gap-2 mb-1 text-left ${isAvailable ? "cursor-pointer" : "cursor-default"}`}
           onClick={() => isAvailable && onSelect(product)}
+          aria-label={`Open ${name}`}
         >
           <h3
             className={`font-medium leading-tight truncate ${isSubcategory ? "text-sm" : "text-base md:text-lg"}
@@ -363,7 +367,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
             </span>
             <span className="text-[10px]">{t("currency", language)}</span>
           </div>
-        </div>
+        </button>
 
         {/* Description (reserve 3 lines to prevent layout shift on language switch) */}
         <p
@@ -475,8 +479,15 @@ const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
   searchQuery,
 }) => {
   const [isExpanded, setIsExpanded] = useState(isSubcategory);
+  const [categoryImageFailed, setCategoryImageFailed] = useState(false);
   const name = getLangValue(category, "name", language);
   const normalizedQuery = normalizeSearchQuery(searchQuery);
+  const categoryThumbSrc =
+    !categoryImageFailed &&
+    (category.image_url ||
+      (!isSubcategory
+        ? category.products.find((product) => product.image_url)?.image_url
+        : ""));
 
   // Filter products by search query
   const filteredProducts = normalizedQuery
@@ -525,27 +536,32 @@ const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          {category.image_url ? (
+          {categoryThumbSrc ? (
             <img
-              src={category.image_url}
+              src={categoryThumbSrc}
               alt=""
               loading="lazy"
               decoding="async"
+              onError={() => setCategoryImageFailed(true)}
               className={`${isSubcategory ? "w-7 h-7" : "w-10 h-10"} rounded-full object-cover border shadow-sm flex-shrink-0
                 ${darkMode ? "border-stone-600" : "border-stone-200"}`}
             />
+          ) : !isSubcategory ? (
+            <span
+              className={`w-10 h-10 rounded-full border flex-shrink-0 inline-flex items-center justify-center text-xs font-bold
+                ${darkMode ? "bg-stone-800 border-stone-700 text-stone-500" : "bg-stone-100 border-stone-200 text-stone-400"}`}
+              aria-hidden="true"
+            >
+              {name.slice(0, 1).toUpperCase()}
+            </span>
           ) : (
-            !isSubcategory &&
-            category.products.some((p) => p.image_url) && (
-              <img
-                src={category.products.find((p) => p.image_url)?.image_url}
-                alt=""
-                loading="lazy"
-                decoding="async"
-                className={`w-10 h-10 rounded-full object-cover border shadow-sm flex-shrink-0
-                  ${darkMode ? "border-stone-600" : "border-stone-200"}`}
-              />
-            )
+            <span
+              className={`w-7 h-7 rounded-full border flex-shrink-0 inline-flex items-center justify-center text-[10px] font-bold
+                ${darkMode ? "bg-stone-800 border-stone-700 text-stone-500" : "bg-stone-100 border-stone-200 text-stone-400"}`}
+              aria-hidden="true"
+            >
+              {name.slice(0, 1).toUpperCase()}
+            </span>
           )}
           <h2
             className={`font-serif whitespace-nowrap transition-colors truncate
@@ -640,7 +656,7 @@ const CategoryNav: React.FC<CategoryNavProps> = ({
   const scrollTo = (id: number) => {
     const el = document.getElementById(`cat-${id}`);
     if (el) {
-      const offset = 120;
+      const offset = 104;
       const top = el.getBoundingClientRect().top + window.scrollY - offset;
       window.scrollTo({ top, behavior: "smooth" });
     }
@@ -664,7 +680,7 @@ const CategoryNav: React.FC<CategoryNavProps> = ({
         {/* Scrollable category titles */}
         <div
           ref={scrollRef}
-          className="flex justify-start md:justify-center overflow-x-scroll overflow-y-hidden gap-5 px-4 py-2 scrollbar-none"
+          className="flex justify-start md:justify-center overflow-x-scroll overflow-y-hidden gap-2 px-3 py-2 scrollbar-none"
           style={
             {
               scrollbarWidth: "none",
@@ -680,16 +696,19 @@ const CategoryNav: React.FC<CategoryNavProps> = ({
               <button
                 key={cat.id}
                 data-cat={cat.id}
+                type="button"
                 onClick={() => scrollTo(cat.id)}
-                className={`flex-shrink-0 bg-transparent rounded-none px-0 py-2 border-b-2 text-xs font-bold uppercase tracking-wider transition-colors whitespace-nowrap
+                aria-current={isActive ? "true" : undefined}
+                title={getLangValue(cat, "name", language)}
+                className={`min-h-11 flex-shrink-0 rounded-full px-4 py-2 border text-xs font-bold uppercase tracking-wider transition-colors whitespace-nowrap
                   ${
                     isActive
                       ? darkMode
-                        ? "text-stone-100 border-stone-100"
-                        : "text-stone-900 border-stone-900"
+                        ? "bg-stone-100 text-stone-900 border-stone-100 shadow-sm"
+                        : "bg-stone-900 text-white border-stone-900 shadow-sm"
                       : darkMode
-                        ? "text-stone-500 border-transparent hover:text-stone-300"
-                        : "text-stone-400 border-transparent hover:text-stone-600"
+                        ? "text-stone-400 border-stone-800 hover:text-stone-100 hover:border-stone-600"
+                        : "text-stone-500 border-stone-200 hover:text-stone-900 hover:border-stone-300"
                   }`}
               >
                 {getLangValue(cat, "name", language)}
@@ -712,21 +731,25 @@ export default function MenuView() {
   const [loadError, setLoadError] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [language, setLanguage] = useState<Language>("MK");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showSearch, setShowSearch] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => {
+    try {
+      return localStorage.getItem("menuDarkMode") !== "0";
+    } catch {
+      return true;
+    }
+  });
   const [showWifi, setShowWifi] = useState(false);
   const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [isAtTop, setIsAtTop] = useState(true);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
-  const searchInputRef = useRef<HTMLInputElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
 
   // Persist dark mode
   useEffect(() => {
-    const saved = localStorage.getItem("menuDarkMode");
-    if (saved === "1") setDarkMode(true);
+    if (localStorage.getItem("menuDarkMode") === null) {
+      localStorage.setItem("menuDarkMode", "1");
+    }
   }, []);
 
   const toggleDark = () => {
@@ -743,7 +766,6 @@ export default function MenuView() {
       setShowBackToTop(window.scrollY > 350);
       setIsAtTop(atTop);
       if (!atTop) {
-        setShowSearch(false);
         setShowWifi(false);
       }
     };
@@ -751,12 +773,6 @@ export default function MenuView() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
-
-  // Focus search input when shown
-  useEffect(() => {
-    if (showSearch) searchInputRef.current?.focus();
-    else setSearchQuery("");
-  }, [showSearch]);
 
   // Intersection observer for active category in nav
   useEffect(() => {
@@ -865,12 +881,11 @@ export default function MenuView() {
   const bg = darkMode
     ? "bg-stone-900 text-stone-100"
     : "bg-[#fcfbf7] text-stone-900";
-  const normalizedSearchQuery = normalizeSearchQuery(searchQuery);
-  const hasSearchResults =
-    !normalizedSearchQuery ||
-    menu.some((cat) =>
-      categoryMatchesSearch(cat, normalizedSearchQuery, language),
-    );
+  const searchQuery = "";
+  const setSearchQuery = (_value: string) => {};
+  const searchInputRef = { current: null } as React.RefObject<HTMLInputElement>;
+  const normalizedSearchQuery = "";
+  const hasSearchResults = true;
 
   return (
     <div
@@ -888,7 +903,7 @@ export default function MenuView() {
           {isAdminAuthenticated && (
             <Link
               to={`/${slug}/admin`}
-              className={`p-2.5 rounded-full shadow-sm border backdrop-blur-md transition-all hover:scale-105
+                className={`min-h-11 min-w-11 inline-flex items-center justify-center rounded-full shadow-sm border backdrop-blur-md transition-all hover:scale-105
                 ${
                   darkMode
                     ? "bg-stone-800/90 border-stone-700 text-stone-400 hover:text-stone-100"
@@ -903,7 +918,7 @@ export default function MenuView() {
 
           <button
             onClick={toggleDark}
-            className={`p-2.5 rounded-full shadow-sm border backdrop-blur-md transition-all hover:scale-105
+            className={`min-h-11 min-w-11 inline-flex items-center justify-center rounded-full shadow-sm border backdrop-blur-md transition-all hover:scale-105
               ${
                 darkMode
                   ? "bg-stone-800/90 border-stone-700 text-amber-400 hover:text-amber-300"
@@ -918,7 +933,7 @@ export default function MenuView() {
           {hasWifi && (
             <button
               onClick={() => setShowWifi((v) => !v)}
-              className={`p-2.5 rounded-full shadow-sm border backdrop-blur-md transition-all hover:scale-105
+              className={`min-h-11 min-w-11 inline-flex items-center justify-center rounded-full shadow-sm border backdrop-blur-md transition-all hover:scale-105
                 ${
                   darkMode
                     ? "bg-stone-800/90 border-stone-700 text-stone-400 hover:text-stone-100"
@@ -936,7 +951,7 @@ export default function MenuView() {
               href={restaurant.facebook_url}
               target="_blank"
               rel="noopener noreferrer"
-              className={`p-2.5 rounded-full shadow-sm border backdrop-blur-md transition-all hover:scale-105
+              className={`min-h-11 min-w-11 inline-flex items-center justify-center rounded-full shadow-sm border backdrop-blur-md transition-all hover:scale-105
                 ${
                   darkMode
                     ? "bg-stone-800/90 border-stone-700 text-stone-400 hover:text-blue-400"
@@ -961,7 +976,7 @@ export default function MenuView() {
               href={restaurant.instagram_url}
               target="_blank"
               rel="noopener noreferrer"
-              className={`p-2.5 rounded-full shadow-sm border backdrop-blur-md transition-all hover:scale-105
+              className={`min-h-11 min-w-11 inline-flex items-center justify-center rounded-full shadow-sm border backdrop-blur-md transition-all hover:scale-105
                 ${
                   darkMode
                     ? "bg-stone-800/90 border-stone-700 text-stone-400 hover:text-pink-400"
@@ -990,21 +1005,6 @@ export default function MenuView() {
               : "-translate-y-[150%] opacity-0 pointer-events-none md:translate-y-0 md:opacity-100 md:pointer-events-auto"
           }`}
         >
-          {/* Search button */}
-          <button
-            onClick={() => setShowSearch((v) => !v)}
-            className={`p-2.5 rounded-full shadow-sm border backdrop-blur-md transition-all hover:scale-105
-              ${
-                darkMode
-                  ? "bg-stone-800/90 border-stone-700 text-stone-400 hover:text-stone-100"
-                  : "bg-white/80 border-stone-200 text-stone-400 hover:text-stone-900"
-              }`}
-            title="Search"
-            aria-label={showSearch ? "Close search" : "Open search"}
-          >
-            {showSearch ? <X size={18} /> : <Search size={18} />}
-          </button>
-
           {/* Language switcher */}
           <div
             className={`rounded-full p-1 shadow-sm border backdrop-blur-md flex items-center gap-0.5
@@ -1033,46 +1033,6 @@ export default function MenuView() {
         </div>
 
         {/* ── Search Bar (expandable) */}
-        <AnimatePresence>
-          {showSearch && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className={`fixed top-16 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-4`}
-            >
-              <div
-                className={`flex items-center gap-3 rounded-2xl border shadow-xl px-4 py-3 backdrop-blur-xl
-                ${darkMode ? "bg-stone-800/95 border-stone-600" : "bg-white/95 border-stone-200"}`}
-              >
-                <Search
-                  size={18}
-                  className={darkMode ? "text-stone-400" : "text-stone-400"}
-                />
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={t("search_placeholder", language)}
-                  className={`flex-1 bg-transparent outline-none text-sm font-medium
-                    ${darkMode ? "text-stone-100 placeholder-stone-500" : "text-stone-900 placeholder-stone-400"}`}
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery("")}
-                    className="text-stone-400 hover:text-stone-600"
-                    aria-label="Clear search"
-                  >
-                    <X size={16} />
-                  </button>
-                )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         {/* ── WiFi Popup */}
         <AnimatePresence>
           {showWifi && hasWifi && (
