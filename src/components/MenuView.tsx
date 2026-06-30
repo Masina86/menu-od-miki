@@ -643,6 +643,7 @@ interface CategoryNavProps {
   language: Language;
   darkMode: boolean;
   activeId: number | null;
+  onCategorySelect: (id: number) => void;
 }
 
 const CategoryNav: React.FC<CategoryNavProps> = ({
@@ -650,6 +651,7 @@ const CategoryNav: React.FC<CategoryNavProps> = ({
   language,
   darkMode,
   activeId,
+  onCategorySelect,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -658,7 +660,10 @@ const CategoryNav: React.FC<CategoryNavProps> = ({
     if (el) {
       const offset = 104;
       const top = el.getBoundingClientRect().top + window.scrollY - offset;
+      onCategorySelect(id);
       window.scrollTo({ top, behavior: "smooth" });
+    } else {
+      onCategorySelect(id);
     }
     // Keep the active title centered in the horizontal nav.
     const pill = scrollRef.current?.querySelector(`[data-cat="${id}"]`);
@@ -743,7 +748,6 @@ export default function MenuView() {
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [isAtTop, setIsAtTop] = useState(true);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
-  const observerRef = useRef<IntersectionObserver | null>(null);
 
   // Persist dark mode
   useEffect(() => {
@@ -759,6 +763,10 @@ export default function MenuView() {
     });
   };
 
+  const selectCategory = useCallback((id: number) => {
+    setActiveCategoryId(id);
+  }, []);
+
   // Scroll detection
   useEffect(() => {
     const onScroll = () => {
@@ -773,27 +781,6 @@ export default function MenuView() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
-
-  // Intersection observer for active category in nav
-  useEffect(() => {
-    if (observerRef.current) observerRef.current.disconnect();
-    observerRef.current = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            const id = Number(entry.target.id.replace("cat-", ""));
-            setActiveCategoryId(id);
-          }
-        }
-      },
-      { rootMargin: "-120px 0px -60% 0px", threshold: 0 },
-    );
-    menu.forEach((cat) => {
-      const el = document.getElementById(`cat-${cat.id}`);
-      if (el) observerRef.current?.observe(el);
-    });
-    return () => observerRef.current?.disconnect();
-  }, [menu]);
 
   const fetchData = useCallback(async () => {
     if (!slug) return;
@@ -1240,6 +1227,7 @@ export default function MenuView() {
           language={language}
           darkMode={darkMode}
           activeId={activeCategoryId}
+          onCategorySelect={selectCategory}
         />
 
         {/* ── Main Content */}
