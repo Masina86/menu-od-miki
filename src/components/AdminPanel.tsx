@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import {
@@ -22,7 +22,6 @@ import {
   LogOut,
   Eye,
   EyeOff,
-  Info,
 } from "lucide-react";
 import { motion, AnimatePresence, Reorder } from "motion/react";
 import { Restaurant, Category, Product } from "../types";
@@ -132,20 +131,6 @@ const AdminLoginView: React.FC<AdminLoginViewProps> = ({
           {error}
         </p>
       )}
-      <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-500 space-y-2">
-        <div className="flex items-start gap-2">
-          <Info size={16} className="mt-0.5 flex-shrink-0 text-stone-400" />
-          <p>
-            Local login uses <span className="font-mono">.env.local</span>.
-            Render login uses the Render Environment variables.
-          </p>
-        </div>
-        <p>
-          For Render, set <span className="font-mono">ADMIN_PASSWORD</span> and{" "}
-          <span className="font-mono">ADMIN_SESSION_SECRET</span>, then rebuild
-          and deploy.
-        </p>
-      </div>
       <button
         type="submit"
         disabled={isLoggingIn}
@@ -2318,6 +2303,29 @@ export default function AdminPanel() {
     }
   };
 
+  const adminStats = useMemo(() => {
+    const categories = menu.flatMap((category) => [
+      category,
+      ...(category.subcategories || []),
+    ]);
+    const products = categories.flatMap((category) => category.products || []);
+    const availableProducts = products.filter(
+      (product) => product.is_available !== 0,
+    );
+    const soldOutProducts = products.length - availableProducts.length;
+    const productsWithoutImages = products.filter(
+      (product) => !product.image_url,
+    ).length;
+
+    return {
+      categories: categories.length,
+      products: products.length,
+      availableProducts: availableProducts.length,
+      soldOutProducts,
+      productsWithoutImages,
+    };
+  }, [menu]);
+
   if (authStatus === "checking" || loading)
     return (
       <div className="flex items-center justify-center h-screen">
@@ -2658,6 +2666,39 @@ export default function AdminPanel() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        <section className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-8">
+          <div className="bg-white border border-stone-200 rounded-xl px-4 py-3">
+            <p className="text-[10px] uppercase tracking-widest text-stone-400 font-bold">
+              Categories
+            </p>
+            <p className="text-2xl font-serif mt-1">{adminStats.categories}</p>
+          </div>
+          <div className="bg-white border border-stone-200 rounded-xl px-4 py-3">
+            <p className="text-[10px] uppercase tracking-widest text-stone-400 font-bold">
+              Products
+            </p>
+            <p className="text-2xl font-serif mt-1">{adminStats.products}</p>
+          </div>
+          <div className="bg-white border border-stone-200 rounded-xl px-4 py-3">
+            <p className="text-[10px] uppercase tracking-widest text-stone-400 font-bold">
+              Available
+            </p>
+            <p className="text-2xl font-serif mt-1">{adminStats.availableProducts}</p>
+          </div>
+          <div className="bg-white border border-stone-200 rounded-xl px-4 py-3">
+            <p className="text-[10px] uppercase tracking-widest text-stone-400 font-bold">
+              Sold out
+            </p>
+            <p className="text-2xl font-serif mt-1">{adminStats.soldOutProducts}</p>
+          </div>
+          <div className="bg-white border border-stone-200 rounded-xl px-4 py-3 col-span-2 md:col-span-1">
+            <p className="text-[10px] uppercase tracking-widest text-stone-400 font-bold">
+              No photo
+            </p>
+            <p className="text-2xl font-serif mt-1">{adminStats.productsWithoutImages}</p>
+          </div>
+        </section>
 
         <section className="space-y-8">
           <div className="flex items-center gap-4 mb-8">
