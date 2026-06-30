@@ -24,7 +24,7 @@ import {
   EyeOff,
 } from "lucide-react";
 import { motion, AnimatePresence, Reorder } from "motion/react";
-import { Restaurant, Category, Product } from "../types";
+import { Restaurant, Category, Product, LogoFit } from "../types";
 import { ImageModal } from "./ImageModal";
 import { AllergenPicker } from "./AllergenIcons";
 import { ApiError, apiRequest, jsonRequest } from "../utils/api";
@@ -61,6 +61,25 @@ const ACCEPTED_IMAGE_FORMATS = [
   "image/vnd.microsoft.icon",
   "image/tiff",
 ].join(",");
+
+const DEFAULT_LOGO_SIZE = 100;
+const MIN_LOGO_SIZE = 60;
+const MAX_LOGO_SIZE = 180;
+const DEFAULT_LOGO_POSITION = 50;
+
+const clampNumber = (
+  value: unknown,
+  min: number,
+  max: number,
+  fallback: number,
+) => {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(number)));
+};
+
+const normalizeLogoFit = (value: unknown): LogoFit =>
+  value === "cover" ? "cover" : "contain";
 
 const isValidOptionalUrl = (value: string) => {
   const trimmed = value.trim();
@@ -1684,6 +1703,10 @@ export default function AdminPanel() {
   const [editRestaurantName, setEditRestaurantName] = useState("");
   const [backgroundUrl, setBackgroundUrl] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
+  const [logoSize, setLogoSize] = useState(DEFAULT_LOGO_SIZE);
+  const [logoFit, setLogoFit] = useState<LogoFit>("contain");
+  const [logoPositionX, setLogoPositionX] = useState(DEFAULT_LOGO_POSITION);
+  const [logoPositionY, setLogoPositionY] = useState(DEFAULT_LOGO_POSITION);
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [wifiPassword, setWifiPassword] = useState("");
@@ -1824,20 +1847,51 @@ export default function AdminPanel() {
     }
   };
 
+  const resetLogoDisplay = () => {
+    setLogoSize(DEFAULT_LOGO_SIZE);
+    setLogoFit("contain");
+    setLogoPositionX(DEFAULT_LOGO_POSITION);
+    setLogoPositionY(DEFAULT_LOGO_POSITION);
+  };
+
+  const clearLogo = () => {
+    setLogoUrl("");
+    resetLogoDisplay();
+  };
+
+  const applyRestaurantToForm = (rest: Restaurant) => {
+    setEditRestaurantName(rest.name);
+    setBackgroundUrl(rest.background_url || "");
+    setLogoUrl(rest.logo_url || "");
+    setLogoSize(
+      clampNumber(
+        rest.logo_size,
+        MIN_LOGO_SIZE,
+        MAX_LOGO_SIZE,
+        DEFAULT_LOGO_SIZE,
+      ),
+    );
+    setLogoFit(normalizeLogoFit(rest.logo_fit));
+    setLogoPositionX(
+      clampNumber(rest.logo_position_x, 0, 100, DEFAULT_LOGO_POSITION),
+    );
+    setLogoPositionY(
+      clampNumber(rest.logo_position_y, 0, 100, DEFAULT_LOGO_POSITION),
+    );
+    setPhone(rest.phone || "");
+    setAddress(rest.address || "");
+    setWifiPassword(rest.wifi_password || "");
+    setOpeningHours(rest.opening_hours || "");
+    setFacebookUrl(rest.facebook_url || "");
+    setInstagramUrl(rest.instagram_url || "");
+  };
+
   const fetchData = async () => {
     try {
       setAdminNotice(null);
       const rest = await apiRequest<Restaurant>(`/api/restaurant/${slug}`);
       setRestaurant(rest);
-      setEditRestaurantName(rest.name);
-      setBackgroundUrl(rest.background_url || "");
-      setLogoUrl(rest.logo_url || "");
-      setPhone(rest.phone || "");
-      setAddress(rest.address || "");
-      setWifiPassword(rest.wifi_password || "");
-      setOpeningHours(rest.opening_hours || "");
-      setFacebookUrl(rest.facebook_url || "");
-      setInstagramUrl(rest.instagram_url || "");
+      applyRestaurantToForm(rest);
 
       const menuData = await apiRequest<Category[]>(`/api/menu/${rest.id}`);
       setMenu(menuData);
@@ -2244,6 +2298,25 @@ export default function AdminPanel() {
     const trimmedOpeningHours = openingHours.trim();
     const trimmedFacebookUrl = facebookUrl.trim();
     const trimmedInstagramUrl = instagramUrl.trim();
+    const normalizedLogoSize = clampNumber(
+      logoSize,
+      MIN_LOGO_SIZE,
+      MAX_LOGO_SIZE,
+      DEFAULT_LOGO_SIZE,
+    );
+    const normalizedLogoFit = normalizeLogoFit(logoFit);
+    const normalizedLogoPositionX = clampNumber(
+      logoPositionX,
+      0,
+      100,
+      DEFAULT_LOGO_POSITION,
+    );
+    const normalizedLogoPositionY = clampNumber(
+      logoPositionY,
+      0,
+      100,
+      DEFAULT_LOGO_POSITION,
+    );
 
     if (!trimmedRestaurantName) {
       setAdminNotice({
@@ -2274,6 +2347,10 @@ export default function AdminPanel() {
         name: trimmedRestaurantName,
         background_url: trimmedBackgroundUrl,
         logo_url: trimmedLogoUrl,
+        logo_size: normalizedLogoSize,
+        logo_fit: normalizedLogoFit,
+        logo_position_x: normalizedLogoPositionX,
+        logo_position_y: normalizedLogoPositionY,
         phone: trimmedPhone,
         address: trimmedAddress,
         wifi_password: trimmedWifiPassword,
@@ -2287,6 +2364,10 @@ export default function AdminPanel() {
         name: trimmedRestaurantName,
         background_url: trimmedBackgroundUrl,
         logo_url: trimmedLogoUrl,
+        logo_size: normalizedLogoSize,
+        logo_fit: normalizedLogoFit,
+        logo_position_x: normalizedLogoPositionX,
+        logo_position_y: normalizedLogoPositionY,
         phone: trimmedPhone,
         address: trimmedAddress,
         wifi_password: trimmedWifiPassword,
@@ -2294,6 +2375,10 @@ export default function AdminPanel() {
         facebook_url: trimmedFacebookUrl,
         instagram_url: trimmedInstagramUrl,
       });
+      setLogoSize(normalizedLogoSize);
+      setLogoFit(normalizedLogoFit);
+      setLogoPositionX(normalizedLogoPositionX);
+      setLogoPositionY(normalizedLogoPositionY);
       setIsEditingRestaurant(false);
       setAdminNotice({
         type: "success",
@@ -2386,6 +2471,11 @@ export default function AdminPanel() {
   if (!restaurant) return <div>Restaurant not found</div>;
 
   const menuUrl = `${window.location.origin}/${restaurant.slug}`;
+  const logoObjectPosition = `${logoPositionX}% ${logoPositionY}%`;
+  const logoPreviewStyle: React.CSSProperties = {
+    objectFit: logoFit,
+    objectPosition: logoObjectPosition,
+  };
 
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900 font-sans p-4 md:p-8">
@@ -2404,15 +2494,7 @@ export default function AdminPanel() {
                     onKeyDown={(e) => {
                       if (e.key === "Enter") updateRestaurantInfo();
                       if (e.key === "Escape") {
-                        setEditRestaurantName(restaurant.name);
-                        setBackgroundUrl(restaurant.background_url || "");
-                        setLogoUrl(restaurant.logo_url || "");
-                        setPhone(restaurant.phone || "");
-                        setAddress(restaurant.address || "");
-                        setWifiPassword(restaurant.wifi_password || "");
-                        setOpeningHours(restaurant.opening_hours || "");
-                        setFacebookUrl(restaurant.facebook_url || "");
-                        setInstagramUrl(restaurant.instagram_url || "");
+                        applyRestaurantToForm(restaurant);
                         setIsEditingRestaurant(false);
                       }
                     }}
@@ -2426,15 +2508,7 @@ export default function AdminPanel() {
                   </button>
                   <button
                     onClick={() => {
-                      setEditRestaurantName(restaurant.name);
-                      setBackgroundUrl(restaurant.background_url || "");
-                      setLogoUrl(restaurant.logo_url || "");
-                      setPhone(restaurant.phone || "");
-                      setAddress(restaurant.address || "");
-                      setWifiPassword(restaurant.wifi_password || "");
-                      setOpeningHours(restaurant.opening_hours || "");
-                      setFacebookUrl(restaurant.facebook_url || "");
-                      setInstagramUrl(restaurant.instagram_url || "");
+                      applyRestaurantToForm(restaurant);
                       setIsEditingRestaurant(false);
                     }}
                     className="text-stone-400 hover:text-stone-600 p-2"
@@ -2560,12 +2634,13 @@ export default function AdminPanel() {
                             <img
                               src={logoUrl}
                               alt="Logo Preview"
-                              className="w-full h-full object-contain"
+                              className="w-full h-full"
+                              style={logoPreviewStyle}
                             />
                             {/* Delete button — no file input behind it */}
                             <button
                               type="button"
-                              onClick={(e) => { e.stopPropagation(); setLogoUrl(""); }}
+                              onClick={(e) => { e.stopPropagation(); clearLogo(); }}
                               className="absolute top-1 right-1 bg-white/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10"
                               title="Remove logo"
                             >
@@ -2604,11 +2679,119 @@ export default function AdminPanel() {
                           placeholder="Or enter image URL..."
                           className="w-full text-sm bg-white border border-stone-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-stone-400"
                           value={logoUrl}
-                          onChange={(e) => setLogoUrl(e.target.value)}
+                          onChange={(e) => {
+                            setLogoUrl(e.target.value);
+                            if (!e.target.value.trim()) resetLogoDisplay();
+                          }}
                         />
                         <p className="text-[10px] text-stone-400 mt-1 italic">
                           Shown in the hero banner and footer.
                         </p>
+                        {logoUrl && (
+                          <div className="mt-3 rounded-lg border border-stone-200 bg-stone-50/70 p-3 space-y-3">
+                            <div className="space-y-1.5">
+                              <div className="flex items-center justify-between gap-3">
+                                <label className="text-[10px] font-bold uppercase text-stone-400">
+                                  Size
+                                </label>
+                                <span className="text-[10px] font-semibold text-stone-500">
+                                  {logoSize}%
+                                </span>
+                              </div>
+                              <input
+                                type="range"
+                                min={MIN_LOGO_SIZE}
+                                max={MAX_LOGO_SIZE}
+                                step="5"
+                                value={logoSize}
+                                onChange={(e) =>
+                                  setLogoSize(Number(e.target.value))
+                                }
+                                className="w-full accent-stone-900"
+                                aria-label="Logo size"
+                              />
+                            </div>
+
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="text-[10px] font-bold uppercase text-stone-400">
+                                Mode
+                              </span>
+                              <div className="inline-flex rounded-lg border border-stone-200 bg-white p-0.5">
+                                {(["contain", "cover"] as const).map((fit) => (
+                                  <button
+                                    key={fit}
+                                    type="button"
+                                    onClick={() => setLogoFit(fit)}
+                                    className={`rounded-md px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide transition-colors ${
+                                      logoFit === fit
+                                        ? "bg-stone-900 text-white"
+                                        : "text-stone-500 hover:text-stone-900"
+                                    }`}
+                                  >
+                                    {fit === "contain" ? "Fit" : "Crop"}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {logoFit === "cover" && (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div className="space-y-1.5">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <label className="text-[10px] font-bold uppercase text-stone-400">
+                                      Crop X
+                                    </label>
+                                    <span className="text-[10px] font-semibold text-stone-500">
+                                      {logoPositionX}%
+                                    </span>
+                                  </div>
+                                  <input
+                                    type="range"
+                                    min="0"
+                                    max="100"
+                                    step="5"
+                                    value={logoPositionX}
+                                    onChange={(e) =>
+                                      setLogoPositionX(Number(e.target.value))
+                                    }
+                                    className="w-full accent-stone-900"
+                                    aria-label="Logo horizontal crop position"
+                                  />
+                                </div>
+                                <div className="space-y-1.5">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <label className="text-[10px] font-bold uppercase text-stone-400">
+                                      Crop Y
+                                    </label>
+                                    <span className="text-[10px] font-semibold text-stone-500">
+                                      {logoPositionY}%
+                                    </span>
+                                  </div>
+                                  <input
+                                    type="range"
+                                    min="0"
+                                    max="100"
+                                    step="5"
+                                    value={logoPositionY}
+                                    onChange={(e) =>
+                                      setLogoPositionY(Number(e.target.value))
+                                    }
+                                    className="w-full accent-stone-900"
+                                    aria-label="Logo vertical crop position"
+                                  />
+                                </div>
+                              </div>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={resetLogoDisplay}
+                              className="text-[10px] font-bold uppercase tracking-wide text-stone-400 hover:text-stone-900"
+                            >
+                              Reset logo display
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

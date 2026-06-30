@@ -6,6 +6,7 @@ import {
   Category,
   Product,
   Language,
+  LogoFit,
   AllergenKey,
   ALLERGEN_ICONS,
   ALLERGEN_LABELS,
@@ -29,6 +30,25 @@ import {
   Clock,
   Send,
 } from "lucide-react";
+
+const DEFAULT_LOGO_SIZE = 100;
+const MIN_LOGO_SIZE = 60;
+const MAX_LOGO_SIZE = 180;
+const DEFAULT_LOGO_POSITION = 50;
+
+const clampNumber = (
+  value: unknown,
+  min: number,
+  max: number,
+  fallback: number,
+) => {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(number)));
+};
+
+const normalizeLogoFit = (value: unknown): LogoFit =>
+  value === "cover" ? "cover" : "contain";
 
 // ─── Translations ───────────────────────────────────────────────────────────
 
@@ -924,6 +944,41 @@ export default function MenuView() {
   const hasHours = !!restaurant.opening_hours;
   const hasSocial = !!(restaurant.facebook_url || restaurant.instagram_url);
   const hasInfo = hasWifi || hasPhone || hasAddress || hasHours;
+  const logoSize = clampNumber(
+    restaurant.logo_size,
+    MIN_LOGO_SIZE,
+    MAX_LOGO_SIZE,
+    DEFAULT_LOGO_SIZE,
+  );
+  const logoScale = logoSize / 100;
+  const logoFit = normalizeLogoFit(restaurant.logo_fit);
+  const logoObjectPosition = `${clampNumber(
+    restaurant.logo_position_x,
+    0,
+    100,
+    DEFAULT_LOGO_POSITION,
+  )}% ${clampNumber(
+    restaurant.logo_position_y,
+    0,
+    100,
+    DEFAULT_LOGO_POSITION,
+  )}%`;
+  const heroLogoStyle: React.CSSProperties = {
+    height: `clamp(${Math.round(120 * logoScale)}px, ${(14 * logoScale).toFixed(
+      1,
+    )}vh, ${Math.round(200 * logoScale)}px)`,
+    width: logoFit === "cover" ? `min(${Math.round(360 * logoScale)}px, 78vw)` : "auto",
+    maxWidth: "78vw",
+    objectFit: logoFit,
+    objectPosition: logoObjectPosition,
+  };
+  const footerLogoStyle: React.CSSProperties = {
+    height: `${Math.round(112 * logoScale)}px`,
+    width: logoFit === "cover" ? `min(${Math.round(260 * logoScale)}px, 70vw)` : "auto",
+    maxWidth: "70vw",
+    objectFit: logoFit,
+    objectPosition: logoObjectPosition,
+  };
 
   const bg = darkMode
     ? "bg-stone-900 text-stone-100"
@@ -1133,8 +1188,8 @@ export default function MenuView() {
                 alt={restaurant.name}
                 loading="eager"
                 decoding="async"
-                className="mx-auto object-contain mb-6 drop-shadow-2xl"
-                style={{ height: "clamp(120px, 14vh, 200px)", width: "auto" }}
+                className="mx-auto mb-6 drop-shadow-2xl"
+                style={heroLogoStyle}
               />
             ) : (
               <p
@@ -1310,8 +1365,7 @@ export default function MenuView() {
                 alt={restaurant.name}
                 loading="lazy"
                 decoding="async"
-                style={{ height: "112px", width: "auto" }}
-                className="object-contain"
+                style={footerLogoStyle}
               />
             ) : (
               <h2

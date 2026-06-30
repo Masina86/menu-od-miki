@@ -108,6 +108,10 @@ const tryAlter = (sql: string) => {
 
 tryAlter("ALTER TABLE restaurants ADD COLUMN background_url TEXT");
 tryAlter("ALTER TABLE restaurants ADD COLUMN logo_url TEXT");
+tryAlter("ALTER TABLE restaurants ADD COLUMN logo_size INTEGER DEFAULT 100");
+tryAlter("ALTER TABLE restaurants ADD COLUMN logo_fit TEXT DEFAULT 'contain'");
+tryAlter("ALTER TABLE restaurants ADD COLUMN logo_position_x INTEGER DEFAULT 50");
+tryAlter("ALTER TABLE restaurants ADD COLUMN logo_position_y INTEGER DEFAULT 50");
 tryAlter("ALTER TABLE restaurants ADD COLUMN phone TEXT");
 tryAlter("ALTER TABLE restaurants ADD COLUMN address TEXT");
 tryAlter("ALTER TABLE restaurants ADD COLUMN wifi_password TEXT");
@@ -184,6 +188,18 @@ async function startServer() {
 
   const isBlank = (v: any) => v == null || String(v).trim() === "";
   const optionalText = (v: any) => (isBlank(v) ? null : String(v).trim());
+  const clampInteger = (
+    value: any,
+    min: number,
+    max: number,
+    fallback: number,
+  ) => {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return fallback;
+    return Math.min(max, Math.max(min, Math.round(number)));
+  };
+  const normalizeLogoFit = (value: any) =>
+    value === "cover" ? "cover" : "contain";
 
   const translateText = async (text: string, target: "EN" | "BG") => {
     const trimmed = (text ?? "").trim();
@@ -421,6 +437,10 @@ async function startServer() {
         slug,
         background_url: null,
         logo_url: null,
+        logo_size: 100,
+        logo_fit: "contain",
+        logo_position_x: 50,
+        logo_position_y: 50,
         phone: null,
         address: null,
         wifi_password: null,
@@ -558,6 +578,10 @@ async function startServer() {
         name,
         background_url,
         logo_url,
+        logo_size,
+        logo_fit,
+        logo_position_x,
+        logo_position_y,
         phone,
         address,
         wifi_password,
@@ -571,12 +595,16 @@ async function startServer() {
 
       const result = db
         .prepare(
-          "UPDATE restaurants SET name = ?, background_url = ?, logo_url = ?, phone = ?, address = ?, wifi_password = ?, opening_hours = ?, facebook_url = ?, instagram_url = ? WHERE id = ?",
+          "UPDATE restaurants SET name = ?, background_url = ?, logo_url = ?, logo_size = ?, logo_fit = ?, logo_position_x = ?, logo_position_y = ?, phone = ?, address = ?, wifi_password = ?, opening_hours = ?, facebook_url = ?, instagram_url = ? WHERE id = ?",
         )
         .run(
           String(name ?? "").trim(),
           optionalText(background_url),
           optionalText(logo_url),
+          clampInteger(logo_size, 60, 180, 100),
+          normalizeLogoFit(logo_fit),
+          clampInteger(logo_position_x, 0, 100, 50),
+          clampInteger(logo_position_y, 0, 100, 50),
           optionalText(phone),
           optionalText(address),
           optionalText(wifi_password),

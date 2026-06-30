@@ -41,12 +41,18 @@ export interface Category {
   sort_order?: number;
 }
 
+export type LogoFit = "contain" | "cover";
+
 export interface Restaurant {
   id: number;
   name: string;
   slug: string;
   background_url?: string;
   logo_url?: string;
+  logo_size?: number;
+  logo_fit?: LogoFit;
+  logo_position_x?: number;
+  logo_position_y?: number;
   phone?: string;
   address?: string;
   wifi_password?: string;
