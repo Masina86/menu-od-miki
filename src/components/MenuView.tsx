@@ -548,8 +548,8 @@ const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
         <div className="flex items-center gap-3 flex-1 min-w-0">
           {categoryThumbSrc ? (
             <span
-              className={`relative flex-shrink-0 rounded-full p-0.5 shadow-sm ${
-                darkMode ? "bg-white ring-1 ring-white/10" : "bg-white ring-1 ring-stone-200"
+              className={`relative flex-shrink-0 rounded-full shadow-sm ${
+                darkMode ? "ring-1 ring-white/15" : "ring-1 ring-stone-200"
               }`}
             >
               <img
@@ -558,12 +558,12 @@ const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
                 loading="lazy"
                 decoding="async"
                 onError={() => setCategoryImageFailed(true)}
-                className={`${isSubcategory ? "w-7 h-7" : "w-12 h-12"} rounded-full object-cover border-2 border-white`}
+                className={`${isSubcategory ? "w-7 h-7" : "w-12 h-12"} rounded-full object-cover border border-white/60`}
               />
             </span>
           ) : !isSubcategory ? (
             <span
-              className={`w-12 h-12 rounded-full border-2 border-white flex-shrink-0 inline-flex items-center justify-center text-sm font-bold shadow-sm
+              className={`w-12 h-12 rounded-full border border-white/60 flex-shrink-0 inline-flex items-center justify-center text-sm font-bold shadow-sm
                 ${darkMode ? "bg-stone-800 text-stone-500 ring-1 ring-white/10" : "bg-stone-100 text-stone-400 ring-1 ring-stone-200"}`}
               aria-hidden="true"
             >
