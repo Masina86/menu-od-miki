@@ -1418,12 +1418,13 @@ export default function MenuView() {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
               onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-              className={`fixed bottom-6 right-6 z-50 p-3 rounded-full shadow-lg border transition-colors
+              className={`fixed bottom-4 right-4 md:bottom-6 md:right-6 z-50 h-9 w-9 md:h-11 md:w-11 inline-flex items-center justify-center rounded-full shadow-lg border transition-colors
                 ${darkMode ? "bg-stone-800 border-stone-700 text-stone-300 hover:bg-stone-700" : "bg-white border-stone-200 text-stone-600 hover:bg-stone-100"}`}
               title="Back to top"
               aria-label="Back to top"
             >
-              <ChevronUp size={20} />
+              <ChevronUp size={16} className="md:hidden" />
+              <ChevronUp size={20} className="hidden md:block" />
             </motion.button>
           )}
         </AnimatePresence>
