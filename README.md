@@ -30,7 +30,11 @@ This app needs a Node server + SQLite database (`menu.db`), so deploy it as a we
    - **Start Command**: `npm run start`
    - **Environment Variables**:
      - `DB_PATH=/var/data/menu.db` (recommended)
+     - `ADMIN_PASSWORD=your-owner-password` (required for admin login)
+     - `ADMIN_SESSION_SECRET=a-long-random-secret` (required to keep admin sessions signed)
      - `GEMINI_API_KEY=...` (optional, enables auto-translation for new items)
 4. Add a **persistent disk** mounted at `/var/data` (or use the provided `render.yaml`).
 
 On first boot, the server will seed the mounted DB from the repo's `menu.db` if the disk is empty.
+
+Guests never need these admin variables. QR codes should point to the public menu URL, for example `/dismak-oil`, and will open without login.

@@ -27,25 +27,162 @@ import {
 import { motion, AnimatePresence, Reorder } from "motion/react";
 import { Restaurant, Category, Product } from "../types";
 import { ImageModal } from "./ImageModal";
+import { ApiError, apiRequest, jsonRequest } from "../utils/api";
+
+type NoticeType = "info" | "success" | "error";
+
+interface Notice {
+  type: NoticeType;
+  message: string;
+}
+
+type ProductFormData = Omit<Product, "id" | "category_id" | "sort_order">;
+
+const isValidOptionalUrl = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.startsWith("data:image/")) return true;
+  try {
+    const url = new URL(trimmed);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
+const noticeClasses: Record<NoticeType, string> = {
+  info: "border-blue-200 bg-blue-50 text-blue-700",
+  success: "border-green-200 bg-green-50 text-green-700",
+  error: "border-red-200 bg-red-50 text-red-600",
+};
+
+const InlineNotice: React.FC<{ notice: Notice | null; className?: string }> = ({
+  notice,
+  className = "",
+}) => {
+  if (!notice) return null;
+  return (
+    <div
+      role={notice.type === "error" ? "alert" : "status"}
+      className={`rounded-xl border px-4 py-3 text-sm ${noticeClasses[notice.type]} ${className}`}
+    >
+      {notice.message}
+    </div>
+  );
+};
+
+interface AdminLoginViewProps {
+  password: string;
+  showPassword: boolean;
+  error: string;
+  isLoggingIn: boolean;
+  onPasswordChange: (value: string) => void;
+  onTogglePassword: () => void;
+  onSubmit: (event: React.FormEvent) => void;
+}
+
+const AdminLoginView: React.FC<AdminLoginViewProps> = ({
+  password,
+  showPassword,
+  error,
+  isLoggingIn,
+  onPasswordChange,
+  onTogglePassword,
+  onSubmit,
+}) => (
+  <div className="min-h-screen bg-stone-50 text-stone-900 font-sans flex items-center justify-center p-6">
+    <form
+      onSubmit={onSubmit}
+      className="w-full max-w-sm bg-white border border-stone-200 rounded-2xl shadow-xl p-8 space-y-5"
+    >
+      <div className="w-12 h-12 rounded-full bg-stone-900 text-stone-50 flex items-center justify-center">
+        <Lock size={20} />
+      </div>
+      <div>
+        <h1 className="text-2xl font-serif">Admin Login</h1>
+        <p className="text-sm text-stone-500 mt-1">
+          Enter the owner password to edit this menu.
+        </p>
+      </div>
+      <div className="space-y-2">
+        <label className="text-[10px] uppercase tracking-widest text-stone-400 font-bold">
+          Password
+        </label>
+        <div className="relative">
+          <input
+            type={showPassword ? "text" : "password"}
+            value={password}
+            onChange={(e) => onPasswordChange(e.target.value)}
+            className="w-full bg-stone-50 border border-stone-200 rounded-xl pl-4 pr-12 py-3 focus:outline-none focus:ring-2 focus:ring-stone-400"
+            autoFocus
+            autoComplete="current-password"
+          />
+          <button
+            type="button"
+            onClick={onTogglePassword}
+            className="absolute right-2 top-1/2 -translate-y-1/2 h-9 w-9 inline-flex items-center justify-center text-stone-400 hover:text-stone-900 transition-colors"
+            title={showPassword ? "Hide password" : "Show password"}
+            aria-label={showPassword ? "Hide password" : "Show password"}
+          >
+            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+          </button>
+        </div>
+      </div>
+      {error && (
+        <p className="text-sm text-red-500" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-500 space-y-2">
+        <div className="flex items-start gap-2">
+          <Info size={16} className="mt-0.5 flex-shrink-0 text-stone-400" />
+          <p>
+            Local login uses <span className="font-mono">.env.local</span>.
+            Render login uses the Render Environment variables.
+          </p>
+        </div>
+        <p>
+          For Render, set <span className="font-mono">ADMIN_PASSWORD</span> and{" "}
+          <span className="font-mono">ADMIN_SESSION_SECRET</span>, then rebuild
+          and deploy.
+        </p>
+      </div>
+      <button
+        type="submit"
+        disabled={isLoggingIn}
+        className="w-full bg-stone-900 text-stone-50 px-4 py-3 rounded-xl text-sm font-bold uppercase tracking-widest hover:bg-stone-800 disabled:opacity-60 transition-colors"
+      >
+        {isLoggingIn ? "Signing in..." : "Sign In"}
+      </button>
+    </form>
+  </div>
+);
 
 interface CategorySectionProps {
   category: Category;
   parentId?: number | null;
   index: number;
   onDelete: (id: number, parentId?: number | null) => void;
-  onUpdateCategory: (id: number, data: any, parentId?: number | null) => void;
-  onAddProduct: (categoryId: number, p: any, parentId?: number | null) => void;
+  onUpdateCategory: (
+    id: number,
+    data: any,
+    parentId?: number | null,
+  ) => Promise<void>;
+  onAddProduct: (
+    categoryId: number,
+    p: ProductFormData,
+    parentId?: number | null,
+  ) => Promise<void>;
   onUpdateProduct: (
     productId: number,
     categoryId: number,
-    p: any,
+    p: ProductFormData,
     parentId?: number | null,
-  ) => void;
+  ) => Promise<void>;
   onDeleteProduct: (
     productId: number,
     categoryId: number,
     parentId?: number | null,
-  ) => void;
+  ) => Promise<void>;
   onMoveProduct: (
     categoryId: number,
     productId: number,
@@ -57,7 +194,7 @@ interface CategorySectionProps {
     direction: "up" | "down",
     parentId?: number | null,
   ) => void;
-  onAddSubcategory: (parentId: number, name: string) => void;
+  onAddSubcategory: (parentId: number, name: string) => Promise<void>;
   onReorderSubcategories: (parentId: number, newOrder: Category[]) => void;
   onBulkImport: (categoryId: number, products: any[]) => Promise<void>;
   isExpanded: boolean;
@@ -84,6 +221,10 @@ const CategorySection: React.FC<CategorySectionProps> = ({
   isSubcategory = false,
 }) => {
   const [isAdding, setIsAdding] = useState(false);
+  const [isSavingProduct, setIsSavingProduct] = useState(false);
+  const [isSavingCategory, setIsSavingCategory] = useState(false);
+  const [isDeletingCategory, setIsDeletingCategory] = useState(false);
+  const [formNotice, setFormNotice] = useState<Notice | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [importStatus, setImportStatus] = useState<{
     type: "idle" | "info" | "success" | "error";
@@ -132,8 +273,26 @@ const CategorySection: React.FC<CategorySectionProps> = ({
     }
   };
 
-  const handleSave = () => {
-    if (!newProd.name || !newProd.price) return;
+  const handleSave = async () => {
+    const price = Number.parseFloat(newProd.price);
+    if (!newProd.name.trim()) {
+      setFormNotice({ type: "error", message: "Product name is required." });
+      return;
+    }
+    if (!Number.isFinite(price) || price < 0) {
+      setFormNotice({
+        type: "error",
+        message: "Product price must be a valid number.",
+      });
+      return;
+    }
+    if (newProd.image_url && !isValidOptionalUrl(newProd.image_url)) {
+      setFormNotice({
+        type: "error",
+        message: "Product image must be a valid URL or uploaded image.",
+      });
+      return;
+    }
 
     const finalAdditions = newProd.hasAdditions
       ? newProd.additions
@@ -147,10 +306,10 @@ const CategorySection: React.FC<CategorySectionProps> = ({
       : [];
 
     const productData = {
-      name: newProd.name,
+      name: newProd.name.trim(),
       name_en: newProd.name_en,
       name_bg: newProd.name_bg,
-      price: parseFloat(newProd.price),
+      price,
       description: newProd.description,
       description_en: newProd.description_en,
       description_bg: newProd.description_bg,
@@ -164,13 +323,30 @@ const CategorySection: React.FC<CategorySectionProps> = ({
       is_new: newProd.is_new,
     };
 
-    if (editingProduct) {
-      onUpdateProduct(editingProduct.id, category.id, productData, parentId);
-    } else {
-      onAddProduct(category.id, productData, parentId);
+    setIsSavingProduct(true);
+    setFormNotice({
+      type: "info",
+      message: editingProduct ? "Updating product..." : "Adding product...",
+    });
+    try {
+      if (editingProduct) {
+        await onUpdateProduct(editingProduct.id, category.id, productData, parentId);
+      } else {
+        await onAddProduct(category.id, productData, parentId);
+      }
+      setFormNotice({
+        type: "success",
+        message: editingProduct ? "Product updated." : "Product added.",
+      });
+      resetForm();
+    } catch (error: any) {
+      setFormNotice({
+        type: "error",
+        message: error?.message || "Could not save product.",
+      });
+    } finally {
+      setIsSavingProduct(false);
     }
-
-    resetForm();
   };
 
   const startEdit = (product: Product) => {
@@ -207,6 +383,7 @@ const CategorySection: React.FC<CategorySectionProps> = ({
   const resetForm = () => {
     setIsAdding(false);
     setEditingProduct(null);
+    setFormNotice(null);
     setNewProd({
       name: "",
       name_en: "",
@@ -278,8 +455,39 @@ const CategorySection: React.FC<CategorySectionProps> = ({
   };
 
   const handleSaveCategory = async () => {
-    await onUpdateCategory(category.id, categoryEditData, parentId);
-    setIsEditingCategory(false);
+    if (!categoryEditData.name.trim()) {
+      setFormNotice({ type: "error", message: "Category name is required." });
+      return;
+    }
+    if (
+      categoryEditData.image_url &&
+      !isValidOptionalUrl(categoryEditData.image_url)
+    ) {
+      setFormNotice({
+        type: "error",
+        message: "Category image must be a valid URL or uploaded image.",
+      });
+      return;
+    }
+
+    setIsSavingCategory(true);
+    setFormNotice({ type: "info", message: "Saving category..." });
+    try {
+      await onUpdateCategory(
+        category.id,
+        { ...categoryEditData, name: categoryEditData.name.trim() },
+        parentId,
+      );
+      setIsEditingCategory(false);
+      setFormNotice({ type: "success", message: "Category updated." });
+    } catch (error: any) {
+      setFormNotice({
+        type: "error",
+        message: error?.message || "Could not update category.",
+      });
+    } finally {
+      setIsSavingCategory(false);
+    }
   };
 
   const handleCsvImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -306,8 +514,6 @@ const CategorySection: React.FC<CategorySectionProps> = ({
           setImportStatus({ type: "error", message: "File is empty." });
           return;
         }
-
-        console.log("CSV raw text length:", text.length);
 
         // Normalize text
         if (text.startsWith("\uFEFF")) text = text.substring(1);
@@ -508,11 +714,23 @@ const CategorySection: React.FC<CategorySectionProps> = ({
     setTimeout(() => setImportStatus(null), 3000);
   };
 
-  const handleSaveSubcategory = () => {
-    if (!newSubcategoryName.trim()) return;
-    onAddSubcategory(category.id, newSubcategoryName);
-    setNewSubcategoryName("");
-    setIsAddingSubcategory(false);
+  const handleSaveSubcategory = async () => {
+    if (!newSubcategoryName.trim()) {
+      setFormNotice({ type: "error", message: "Subcategory name is required." });
+      return;
+    }
+    setFormNotice({ type: "info", message: "Adding subcategory..." });
+    try {
+      await onAddSubcategory(category.id, newSubcategoryName.trim());
+      setNewSubcategoryName("");
+      setIsAddingSubcategory(false);
+      setFormNotice({ type: "success", message: "Subcategory added." });
+    } catch (error: any) {
+      setFormNotice({
+        type: "error",
+        message: error?.message || "Could not add subcategory.",
+      });
+    }
   };
 
   return (
@@ -636,6 +854,7 @@ const CategorySection: React.FC<CategorySectionProps> = ({
             <h4 className="text-[10px] uppercase tracking-widest text-stone-400 font-bold">
               Edit Category
             </h4>
+            <InlineNotice notice={formNotice} />
             <div className="flex flex-col gap-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-1">
@@ -715,9 +934,10 @@ const CategorySection: React.FC<CategorySectionProps> = ({
               </button>
               <button
                 onClick={handleSaveCategory}
-                className="bg-stone-900 text-stone-50 px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-stone-800 transition-colors shadow-sm"
+                disabled={isSavingCategory}
+                className="bg-stone-900 text-stone-50 px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-stone-800 disabled:opacity-60 transition-colors shadow-sm"
               >
-                Save Changes
+                {isSavingCategory ? "Saving..." : "Save Changes"}
               </button>
             </div>
           </motion.div>
@@ -757,13 +977,21 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                   Cancel
                 </button>
                 <button
-                  onClick={() => {
-                    onDelete(category.id, parentId);
-                    setShowDeleteConfirm(false);
+                  onClick={async () => {
+                    setIsDeletingCategory(true);
+                    try {
+                      await onDelete(category.id, parentId);
+                      setShowDeleteConfirm(false);
+                    } catch {
+                      // Parent handler shows the visible error notice.
+                    } finally {
+                      setIsDeletingCategory(false);
+                    }
                   }}
-                  className="flex-1 bg-red-500 text-white px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-red-600 transition-colors shadow-sm"
+                  disabled={isDeletingCategory}
+                  className="flex-1 bg-red-500 text-white px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-red-600 disabled:opacity-60 transition-colors shadow-sm"
                 >
-                  Delete
+                  {isDeletingCategory ? "Deleting..." : "Delete"}
                 </button>
               </div>
             </motion.div>
@@ -1240,17 +1468,24 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                   </div>
 
                   <div className="flex justify-end gap-3 pt-4 border-t border-stone-200/50">
+                    <InlineNotice notice={formNotice} className="mr-auto" />
                     <button
                       onClick={resetForm}
+                      disabled={isSavingProduct}
                       className="px-4 py-2 text-xs text-stone-400 uppercase tracking-widest font-bold hover:text-stone-600 transition-colors"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={handleSave}
-                      className="bg-stone-900 text-stone-50 px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-stone-800 transition-colors shadow-sm"
+                      disabled={isSavingProduct}
+                      className="bg-stone-900 text-stone-50 px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-stone-800 disabled:opacity-60 transition-colors shadow-sm"
                     >
-                      {editingProduct ? "Update Product" : "Add Product"}
+                      {isSavingProduct
+                        ? "Saving..."
+                        : editingProduct
+                          ? "Update Product"
+                          : "Add Product"}
                     </button>
                   </div>
                 </motion.div>
@@ -1354,7 +1589,7 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                       </div>
                       <button
                         onClick={() => {
-                          onUpdateProduct(
+                          void onUpdateProduct(
                             product.id,
                             category.id,
                             {
@@ -1362,6 +1597,13 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                               is_available: product.is_available === 0 ? 1 : 0,
                             },
                             parentId,
+                          ).catch((error) =>
+                            setFormNotice({
+                              type: "error",
+                              message:
+                                error?.message ||
+                                "Could not update product availability.",
+                            }),
                           );
                         }}
                         className={`transition-colors p-2 ${product.is_available === 0 ? "text-red-500 hover:text-green-500" : "text-stone-300 hover:text-red-500"}`}
@@ -1381,9 +1623,19 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                         <Pencil size={16} />
                       </button>
                       <button
-                        onClick={() =>
-                          onDeleteProduct(product.id, category.id, parentId)
-                        }
+                        onClick={() => {
+                          void onDeleteProduct(
+                            product.id,
+                            category.id,
+                            parentId,
+                          ).catch((error) =>
+                            setFormNotice({
+                              type: "error",
+                              message:
+                                error?.message || "Could not delete product.",
+                            }),
+                          );
+                        }}
                         className="text-stone-200 hover:text-red-500 transition-colors p-2"
                         title="Delete Product"
                       >
@@ -1434,6 +1686,9 @@ export default function AdminPanel() {
   const [openingHours, setOpeningHours] = useState("");
   const [facebookUrl, setFacebookUrl] = useState("");
   const [instagramUrl, setInstagramUrl] = useState("");
+  const [adminNotice, setAdminNotice] = useState<Notice | null>(null);
+  const [reorderNotice, setReorderNotice] = useState<Notice | null>(null);
+  const [savingAction, setSavingAction] = useState<string | null>(null);
   type ReorderType = "categories" | "products";
   const reorderTimeoutsRef = React.useRef<
     Partial<Record<ReorderType, ReturnType<typeof setTimeout>>>
@@ -1447,17 +1702,7 @@ export default function AdminPanel() {
     ids: number[],
     keepalive = false,
   ) => {
-    const res = await fetch(`/api/${type}/reorder`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids }),
-      keepalive,
-    });
-
-    if (!res.ok) {
-      const message = await res.text();
-      throw new Error(message || `Failed to save ${type} order`);
-    }
+    await jsonRequest<void>(`/api/${type}/reorder`, "PUT", { ids }, { keepalive });
   };
 
   const debouncedReorder = (type: ReorderType, ids: number[]) => {
@@ -1473,10 +1718,16 @@ export default function AdminPanel() {
       delete pendingReordersRef.current[type];
 
       try {
+        setReorderNotice({ type: "info", message: "Saving order..." });
         await saveReorder(type, pendingIds);
+        setReorderNotice({ type: "success", message: "Order saved." });
+        window.setTimeout(() => setReorderNotice(null), 2500);
       } catch (error) {
         console.error(`Error reordering ${type}:`, error);
-        alert(`Could not save the new ${type} order. Please try again.`);
+        setReorderNotice({
+          type: "error",
+          message: `Could not save the new ${type} order. Please try again.`,
+        });
       }
     }, 150);
   };
@@ -1500,10 +1751,11 @@ export default function AdminPanel() {
   }, []);
 
   useEffect(() => {
-    const checkSession = async () => {
+  const checkSession = async () => {
       try {
-        const res = await fetch("/api/auth/session");
-        const data = await res.json();
+        const data = await apiRequest<{ authenticated: boolean }>(
+          "/api/auth/session",
+        );
         setAuthStatus(data.authenticated ? "authenticated" : "unauthenticated");
         setLoading(data.authenticated);
       } catch (error) {
@@ -1554,6 +1806,7 @@ export default function AdminPanel() {
   };
 
   const logout = async () => {
+    setSavingAction("logout");
     try {
       await fetch("/api/auth/logout", { method: "POST" });
     } catch (error) {
@@ -1563,18 +1816,14 @@ export default function AdminPanel() {
       setMenu([]);
       setAuthStatus("unauthenticated");
       setLoading(false);
+      setSavingAction(null);
     }
   };
 
   const fetchData = async () => {
     try {
-      const resRest = await fetch(`/api/restaurant/${slug}`);
-      if (resRest.status === 401) {
-        setAuthStatus("unauthenticated");
-        return;
-      }
-      if (!resRest.ok) throw new Error("Failed to load restaurant");
-      const rest = await resRest.json();
+      setAdminNotice(null);
+      const rest = await apiRequest<Restaurant>(`/api/restaurant/${slug}`);
       setRestaurant(rest);
       setEditRestaurantName(rest.name);
       setBackgroundUrl(rest.background_url || "");
@@ -1586,68 +1835,60 @@ export default function AdminPanel() {
       setFacebookUrl(rest.facebook_url || "");
       setInstagramUrl(rest.instagram_url || "");
 
-      const resMenu = await fetch(`/api/menu/${rest.id}`);
-      if (resMenu.status === 401) {
+      const menuData = await apiRequest<Category[]>(`/api/menu/${rest.id}`);
+      setMenu(menuData);
+    } catch (error: any) {
+      if (error instanceof ApiError && error.status === 401) {
         setAuthStatus("unauthenticated");
         return;
       }
-      if (!resMenu.ok) throw new Error("Failed to load menu");
-      const menuData = await resMenu.json();
-      setMenu(menuData);
-    } catch (error) {
       console.error("Error fetching data:", error);
+      setAdminNotice({
+        type: "error",
+        message: error?.message || "Could not load admin data.",
+      });
     } finally {
       setLoading(false);
     }
   };
 
   const addCategory = async () => {
-    if (!newCategoryName.trim() || !restaurant) return;
+    if (!restaurant) return;
+    if (!newCategoryName.trim()) {
+      setAdminNotice({ type: "error", message: "Category name is required." });
+      return;
+    }
 
+    setSavingAction("category");
+    setAdminNotice({ type: "info", message: "Adding category..." });
     try {
-      const res = await fetch("/api/categories", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const newCat = await jsonRequest<Category>("/api/categories", "POST", {
           restaurant_id: restaurant.id,
           name: newCategoryName.trim(),
           parent_id: null,
-        }),
       });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || "Failed to add category");
-      }
-
-      const newCat = await res.json();
       setMenu([...menu, newCat]);
       setNewCategoryName("");
+      setAdminNotice({ type: "success", message: "Category added." });
     } catch (error: any) {
       console.error("Error adding category:", error);
-      alert("Error adding category: " + error.message);
+      setAdminNotice({
+        type: "error",
+        message: error?.message || "Could not add category.",
+      });
+    } finally {
+      setSavingAction(null);
     }
   };
 
   const addSubcategory = async (parentId: number, name: string) => {
     if (!restaurant || !name.trim()) return;
     try {
-      const res = await fetch("/api/categories", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const newSub = await jsonRequest<Category>("/api/categories", "POST", {
           restaurant_id: restaurant.id,
           name: name.trim(),
           parent_id: parentId,
-        }),
       });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || "Failed to add subcategory");
-      }
-
-      const newSub = await res.json();
       setMenu(
         menu.map((cat) =>
           cat.id === parentId
@@ -1657,14 +1898,18 @@ export default function AdminPanel() {
       );
     } catch (error: any) {
       console.error("Error adding subcategory:", error);
-      alert("Error adding subcategory: " + error.message);
+      setAdminNotice({
+        type: "error",
+        message: error?.message || "Could not add subcategory.",
+      });
+      throw error;
     }
   };
 
   const deleteCategory = async (id: number, parentId: number | null = null) => {
+    setSavingAction(`delete-category-${id}`);
     try {
-      const res = await fetch(`/api/categories/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete category");
+      await apiRequest<void>(`/api/categories/${id}`, { method: "DELETE" });
 
       if (parentId) {
         setMenu(
@@ -1680,9 +1925,16 @@ export default function AdminPanel() {
       } else {
         setMenu(menu.filter((c) => c.id !== id));
       }
+      setAdminNotice({ type: "success", message: "Category deleted." });
     } catch (error: any) {
       console.error("Error deleting category:", error);
-      alert("Error deleting category: " + error.message);
+      setAdminNotice({
+        type: "error",
+        message: error?.message || "Could not delete category.",
+      });
+      throw error;
+    } finally {
+      setSavingAction(null);
     }
   };
 
@@ -1692,15 +1944,11 @@ export default function AdminPanel() {
     parentId: number | null = null,
   ) => {
     try {
-      const res = await fetch(`/api/categories/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-
-      if (!res.ok) throw new Error("Failed to update category");
-
-      const updated = await res.json();
+      const updated = await jsonRequest<Partial<Category>>(
+        `/api/categories/${id}`,
+        "PUT",
+        data,
+      );
       if (parentId) {
         setMenu(
           menu.map((cat) =>
@@ -1719,28 +1967,24 @@ export default function AdminPanel() {
       }
     } catch (error: any) {
       console.error("Error updating category:", error);
-      alert("Error updating category: " + error.message);
+      setAdminNotice({
+        type: "error",
+        message: error?.message || "Could not update category.",
+      });
+      throw error;
     }
   };
 
   const addProduct = async (
     categoryId: number,
-    product: any,
+    product: ProductFormData,
     parentId: number | null = null,
   ) => {
     try {
-      const res = await fetch("/api/products", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category_id: categoryId, ...product }),
+      const newProd = await jsonRequest<Product>("/api/products", "POST", {
+        category_id: categoryId,
+        ...product,
       });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || "Failed to add product");
-      }
-
-      const newProd = await res.json();
 
       if (parentId) {
         setMenu(
@@ -1768,26 +2012,26 @@ export default function AdminPanel() {
       }
     } catch (error: any) {
       console.error("Error adding product:", error);
-      alert("Error adding product: " + error.message);
+      setAdminNotice({
+        type: "error",
+        message: error?.message || "Could not add product.",
+      });
+      throw error;
     }
   };
 
   const updateProduct = async (
     productId: number,
     categoryId: number,
-    product: any,
+    product: ProductFormData,
     parentId: number | null = null,
   ) => {
     try {
-      const res = await fetch(`/api/products/${productId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(product),
-      });
-
-      if (!res.ok) throw new Error("Failed to update product");
-
-      const updatedProd = await res.json();
+      const updatedProd = await jsonRequest<Product>(
+        `/api/products/${productId}`,
+        "PUT",
+        product,
+      );
 
       if (parentId) {
         setMenu(
@@ -1825,7 +2069,11 @@ export default function AdminPanel() {
       }
     } catch (error: any) {
       console.error("Error updating product:", error);
-      alert("Error updating product: " + error.message);
+      setAdminNotice({
+        type: "error",
+        message: error?.message || "Could not update product.",
+      });
+      throw error;
     }
   };
 
@@ -1834,11 +2082,11 @@ export default function AdminPanel() {
     categoryId: number,
     parentId: number | null = null,
   ) => {
+    setSavingAction(`delete-product-${productId}`);
     try {
-      const res = await fetch(`/api/products/${productId}`, {
+      await apiRequest<void>(`/api/products/${productId}`, {
         method: "DELETE",
       });
-      if (!res.ok) throw new Error("Failed to delete product");
 
       if (parentId) {
         setMenu(
@@ -1872,9 +2120,16 @@ export default function AdminPanel() {
           ),
         );
       }
+      setAdminNotice({ type: "success", message: "Product deleted." });
     } catch (error: any) {
       console.error("Error deleting product:", error);
-      alert("Error deleting product: " + error.message);
+      setAdminNotice({
+        type: "error",
+        message: error?.message || "Could not delete product.",
+      });
+      throw error;
+    } finally {
+      setSavingAction(null);
     }
   };
 
@@ -1975,12 +2230,33 @@ export default function AdminPanel() {
   };
 
   const updateRestaurantInfo = async () => {
-    if (!restaurant || !editRestaurantName.trim()) return;
+    if (!restaurant) return;
+    if (!editRestaurantName.trim()) {
+      setAdminNotice({
+        type: "error",
+        message: "Restaurant name is required.",
+      });
+      return;
+    }
+    const urlFields = [
+      ["logo", logoUrl],
+      ["hero background", backgroundUrl],
+      ["Facebook", facebookUrl],
+      ["Instagram", instagramUrl],
+    ] as const;
+    const invalidUrl = urlFields.find(([, value]) => !isValidOptionalUrl(value));
+    if (invalidUrl) {
+      setAdminNotice({
+        type: "error",
+        message: `${invalidUrl[0]} URL must be empty, an uploaded image, or a valid http(s) URL.`,
+      });
+      return;
+    }
+
+    setSavingAction("restaurant");
+    setAdminNotice({ type: "info", message: "Saving restaurant info..." });
     try {
-      const res = await fetch(`/api/restaurant/${restaurant.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      await jsonRequest(`/api/restaurant/${restaurant.id}`, "PUT", {
           name: editRestaurantName,
           background_url: backgroundUrl,
           logo_url: logoUrl,
@@ -1990,13 +2266,7 @@ export default function AdminPanel() {
           opening_hours: openingHours,
           facebook_url: facebookUrl,
           instagram_url: instagramUrl,
-        }),
       });
-
-      if (!res.ok) throw new Error("Failed to update restaurant info");
-
-      const data = await res.json();
-      console.log("Update success response:", data);
 
       setRestaurant({
         ...restaurant,
@@ -2011,10 +2281,18 @@ export default function AdminPanel() {
         instagram_url: instagramUrl,
       });
       setIsEditingRestaurant(false);
-      alert("Restaurant info updated successfully!");
+      setAdminNotice({
+        type: "success",
+        message: "Restaurant info updated.",
+      });
     } catch (error: any) {
       console.error("Error updating restaurant info:", error);
-      alert("Error updating restaurant info: " + error.message);
+      setAdminNotice({
+        type: "error",
+        message: error?.message || "Could not update restaurant info.",
+      });
+    } finally {
+      setSavingAction(null);
     }
   };
 
@@ -2049,72 +2327,15 @@ export default function AdminPanel() {
 
   if (authStatus === "unauthenticated")
     return (
-      <div className="min-h-screen bg-stone-50 text-stone-900 font-sans flex items-center justify-center p-6">
-        <form
-          onSubmit={login}
-          className="w-full max-w-sm bg-white border border-stone-200 rounded-2xl shadow-xl p-8 space-y-5"
-        >
-          <div className="w-12 h-12 rounded-full bg-stone-900 text-stone-50 flex items-center justify-center">
-            <Lock size={20} />
-          </div>
-          <div>
-            <h1 className="text-2xl font-serif">Admin Login</h1>
-            <p className="text-sm text-stone-500 mt-1">
-              Enter the owner password to edit this menu.
-            </p>
-          </div>
-          <div className="space-y-2">
-            <label className="text-[10px] uppercase tracking-widest text-stone-400 font-bold">
-              Password
-            </label>
-            <div className="relative">
-              <input
-                type={showAdminPassword ? "text" : "password"}
-                value={adminPassword}
-                onChange={(e) => setAdminPassword(e.target.value)}
-                className="w-full bg-stone-50 border border-stone-200 rounded-xl pl-4 pr-12 py-3 focus:outline-none focus:ring-2 focus:ring-stone-400"
-                autoFocus
-                autoComplete="current-password"
-              />
-              <button
-                type="button"
-                onClick={() => setShowAdminPassword((visible) => !visible)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 h-9 w-9 inline-flex items-center justify-center text-stone-400 hover:text-stone-900 transition-colors"
-                title={showAdminPassword ? "Hide password" : "Show password"}
-                aria-label={showAdminPassword ? "Hide password" : "Show password"}
-              >
-                {showAdminPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-          </div>
-          {loginError && (
-            <p className="text-sm text-red-500" role="alert">
-              {loginError}
-            </p>
-          )}
-          <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-500 space-y-2">
-            <div className="flex items-start gap-2">
-              <Info size={16} className="mt-0.5 flex-shrink-0 text-stone-400" />
-              <p>
-                Local login uses <span className="font-mono">.env.local</span>.
-                Render login uses the Render Environment variables.
-              </p>
-            </div>
-            <p>
-              For Render, set <span className="font-mono">ADMIN_PASSWORD</span>{" "}
-              and <span className="font-mono">ADMIN_SESSION_SECRET</span>, then
-              rebuild and deploy.
-            </p>
-          </div>
-          <button
-            type="submit"
-            disabled={isLoggingIn}
-            className="w-full bg-stone-900 text-stone-50 px-4 py-3 rounded-xl text-sm font-bold uppercase tracking-widest hover:bg-stone-800 disabled:opacity-60 transition-colors"
-          >
-            {isLoggingIn ? "Signing in..." : "Sign In"}
-          </button>
-        </form>
-      </div>
+      <AdminLoginView
+        password={adminPassword}
+        showPassword={showAdminPassword}
+        error={loginError}
+        isLoggingIn={isLoggingIn}
+        onPasswordChange={setAdminPassword}
+        onTogglePassword={() => setShowAdminPassword((visible) => !visible)}
+        onSubmit={login}
+      />
     );
 
   if (!restaurant) return <div>Restaurant not found</div>;
@@ -2153,9 +2374,10 @@ export default function AdminPanel() {
                   />
                   <button
                     onClick={updateRestaurantInfo}
-                    className="bg-stone-900 text-stone-50 px-4 py-2 rounded-lg hover:bg-stone-800 transition-colors"
+                    disabled={savingAction === "restaurant"}
+                    className="bg-stone-900 text-stone-50 px-4 py-2 rounded-lg hover:bg-stone-800 disabled:opacity-60 transition-colors"
                   >
-                    Save
+                    {savingAction === "restaurant" ? "Saving..." : "Save"}
                   </button>
                   <button
                     onClick={() => {
@@ -2387,14 +2609,19 @@ export default function AdminPanel() {
             <p className="text-stone-500 uppercase tracking-widest text-xs">
               Admin Dashboard
             </p>
+            <div className="mt-4 space-y-2">
+              <InlineNotice notice={adminNotice} />
+              <InlineNotice notice={reorderNotice} />
+            </div>
           </div>
           <div className="flex gap-3">
             <button
               onClick={logout}
+              disabled={savingAction === "logout"}
               className="flex items-center gap-2 border border-stone-300 px-4 py-2 rounded-full text-sm hover:bg-stone-100 transition-colors"
             >
               <LogOut size={16} />
-              Logout
+              {savingAction === "logout" ? "Logging out..." : "Logout"}
             </button>
             <button
               onClick={() => setShowQR(!showQR)}
@@ -2444,9 +2671,15 @@ export default function AdminPanel() {
             />
             <button
               onClick={() => addCategory()}
-              className="bg-stone-900 text-stone-50 p-3 rounded-xl hover:bg-stone-800 transition-colors"
+              disabled={savingAction === "category"}
+              className="bg-stone-900 text-stone-50 p-3 rounded-xl hover:bg-stone-800 disabled:opacity-60 transition-colors"
+              aria-label="Add category"
             >
-              <Plus size={24} />
+              {savingAction === "category" ? (
+                <Loader2 size={24} className="animate-spin" />
+              ) : (
+                <Plus size={24} />
+              )}
             </button>
           </div>
 
@@ -2483,71 +2716,15 @@ export default function AdminPanel() {
                       );
                     }
                     try {
-                      const extractErrorMessage = (raw: string) => {
-                        if (!raw) return "";
-                        try {
-                          const parsed = JSON.parse(raw);
-                          const err =
-                            (parsed as any)?.error || (parsed as any)?.message;
-                          return typeof err === "string" && err.trim()
-                            ? err
-                            : raw;
-                        } catch {
-                          return raw;
-                        }
-                      };
-
-                      console.log(
-                        `Starting bulk import for category ${cid}...`,
-                      );
-                      const res = await fetch(
+                      await jsonRequest(
                         `/api/categories/${cid}/products/bulk`,
-                        {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ products: prods }),
-                        },
+                        "POST",
+                        { products: prods },
                       );
-                      console.log(
-                        "Bulk import response:",
-                        res.status,
-                        res.statusText,
+                      const data = await apiRequest<Category[]>(
+                        `/api/menu/${restaurant.id}`,
                       );
-
-                      if (res.ok) {
-                        const menuRes = await fetch(
-                          `/api/menu/${restaurant.id}`,
-                        );
-                        console.log(
-                          "Menu refresh response:",
-                          menuRes.status,
-                          menuRes.statusText,
-                        );
-                        const menuRaw = await menuRes.text();
-                        if (!menuRes.ok) {
-                          const msg = extractErrorMessage(menuRaw);
-                          throw new Error(
-                            msg ||
-                              `Failed to refresh menu (HTTP ${menuRes.status}).`,
-                          );
-                        }
-                        let data: any;
-                        try {
-                          data = JSON.parse(menuRaw);
-                        } catch {
-                          throw new Error(
-                            `Menu refresh returned non-JSON (HTTP ${menuRes.status}). If you're on port 5173, start the app via the Express server (port 3000).`,
-                          );
-                        }
-                        setMenu(data);
-                      } else {
-                        const raw = await res.text();
-                        const msg = extractErrorMessage(raw);
-                        throw new Error(
-                          msg ||
-                            `Failed to import products (HTTP ${res.status}).`,
-                        );
-                      }
+                      setMenu(data);
                     } catch (err: any) {
                       console.error("Bulk import fetch error:", err);
                       throw err;

@@ -2,6 +2,12 @@ import React from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { X, Tag, AlertCircle, Star, Sparkles } from "lucide-react";
 import { Product, Language, ALLERGEN_ICONS, ALLERGEN_LABELS } from "../types";
+import {
+  getAllergenList,
+  getLangValue,
+  getTagList,
+  isMissingTranslation,
+} from "../utils/menuHelpers";
 
 interface ImageModalProps {
   isOpen: boolean;
@@ -10,42 +16,6 @@ interface ImageModalProps {
   language: Language;
   darkMode?: boolean;
 }
-
-const getLangValue = (obj: any, field: string, lang: Language): string => {
-  const dbValue =
-    lang === "EN"
-      ? obj[`${field}_en`]
-      : lang === "BG"
-        ? obj[`${field}_bg`]
-        : obj[field];
-  if (dbValue && String(dbValue).trim() !== "") return dbValue;
-  return obj[field] || "";
-};
-
-const isMissingTranslation = (obj: any, field: string, lang: Language) => {
-  if (lang === "MK") return false;
-  const translated =
-    lang === "EN" ? obj[`${field}_en`] : lang === "BG" ? obj[`${field}_bg`] : "";
-  const translatedOk = translated && String(translated).trim() !== "";
-  const baseOk = obj[field] && String(obj[field]).trim() !== "";
-  return baseOk && !translatedOk;
-};
-
-const getAllergenList = (allergens?: string) => {
-  if (!allergens) return [];
-  return allergens
-    .split(",")
-    .map((a) => a.trim())
-    .filter(Boolean);
-};
-
-const getTagList = (tags?: string): string[] => {
-  if (!tags) return [];
-  return tags
-    .split(",")
-    .map((t) => t.trim())
-    .filter(Boolean);
-};
 
 const DietaryBadge: React.FC<{ tag: string }> = ({ tag }) => {
   const config: Record<string, { emoji: string; color: string }> = {
@@ -185,6 +155,7 @@ export const ImageModal: React.FC<ImageModalProps> = ({
             {/* Close Button */}
             <button
               onClick={onClose}
+              aria-label="Close product details"
               className={`absolute top-5 right-5 z-20 p-2.5 rounded-full transition-all
                 ${
                   darkMode
@@ -204,6 +175,8 @@ export const ImageModal: React.FC<ImageModalProps> = ({
                   <img
                     src={product.image_url}
                     alt={getLangValue(product, "name", language)}
+                    loading="lazy"
+                    decoding="async"
                     className={`w-full h-full object-cover transition-all ${!isAvailable ? "grayscale opacity-60" : ""}`}
                     style={{ minHeight: 260, maxHeight: 520 }}
                   />

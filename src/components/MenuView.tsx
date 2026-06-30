@@ -196,6 +196,44 @@ const DietaryBadge: React.FC<{ tag: string }> = ({ tag }) => {
   );
 };
 
+const MenuSkeleton: React.FC<{ darkMode: boolean }> = ({ darkMode }) => (
+  <div
+    className={`min-h-screen px-4 py-8 ${darkMode ? "bg-stone-900" : "bg-[#fcfbf7]"}`}
+  >
+    <div className="max-w-2xl mx-auto space-y-5 animate-pulse">
+      <div
+        className={`h-56 rounded-b-[2rem] ${darkMode ? "bg-stone-800" : "bg-stone-100"}`}
+      />
+      {[0, 1, 2, 3].map((i) => (
+        <div
+          key={i}
+          className={`rounded-2xl border p-4 ${darkMode ? "border-stone-700" : "border-stone-100"}`}
+        >
+          <div
+            className={`h-5 w-40 rounded ${darkMode ? "bg-stone-700" : "bg-stone-200"}`}
+          />
+          <div className="mt-4 flex gap-4">
+            <div
+              className={`h-20 w-20 rounded-2xl ${darkMode ? "bg-stone-800" : "bg-stone-100"}`}
+            />
+            <div className="flex-1 space-y-3">
+              <div
+                className={`h-4 w-3/4 rounded ${darkMode ? "bg-stone-700" : "bg-stone-200"}`}
+              />
+              <div
+                className={`h-3 w-full rounded ${darkMode ? "bg-stone-800" : "bg-stone-100"}`}
+              />
+              <div
+                className={`h-3 w-2/3 rounded ${darkMode ? "bg-stone-800" : "bg-stone-100"}`}
+              />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
 // ─── Product Card ────────────────────────────────────────────────────────────
 
 interface ProductCardProps {
@@ -213,6 +251,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   isSubcategory = false,
   darkMode,
 }) => {
+  const [imageFailed, setImageFailed] = useState(false);
   const isAvailable = product.is_available !== 0;
   const isFeatured = product.is_featured === 1;
   const isNew = product.is_new === 1;
@@ -237,9 +276,12 @@ const ProductCard: React.FC<ProductCardProps> = ({
         ${!isAvailable ? "opacity-50" : ""}`}
     >
       {/* Image */}
-      {product.image_url && (
+      <div
+        className={`relative shrink-0 ${isSubcategory ? "w-14 h-14" : "w-20 h-20 md:w-24 md:h-24"}`}
+      >
+      {product.image_url && !imageFailed ? (
         <div
-          className={`relative shrink-0 cursor-zoom-in ${isSubcategory ? "w-14 h-14" : "w-20 h-20 md:w-24 md:h-24"}`}
+          className="relative w-full h-full cursor-zoom-in"
           onClick={() => isAvailable && onSelect(product)}
         >
           <img
@@ -247,6 +289,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
             alt={name}
             loading="lazy"
             decoding="async"
+            onError={() => setImageFailed(true)}
             className={`w-full h-full object-cover rounded-2xl border shadow-sm transition-all
               ${darkMode ? "border-stone-700" : "border-stone-100"}
               ${!isAvailable ? "grayscale" : "group-hover:scale-105"}`}
@@ -264,7 +307,19 @@ const ProductCard: React.FC<ProductCardProps> = ({
             </div>
           )}
         </div>
+      ) : (
+        <div
+          className={`w-full h-full rounded-2xl border flex items-center justify-center ${
+            darkMode
+              ? "bg-stone-800 border-stone-700 text-stone-600"
+              : "bg-stone-100 border-stone-200 text-stone-300"
+          }`}
+          aria-hidden="true"
+        >
+          <Sparkles size={18} />
+        </div>
       )}
+      </div>
 
       {/* Content */}
       <div className="flex-1 min-w-0">
@@ -461,8 +516,11 @@ const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
       }
     >
       {/* Category header */}
-      <div
-        className={`flex items-center justify-between gap-3 py-3 cursor-pointer group
+      <button
+        type="button"
+        aria-expanded={isExpanded}
+        aria-controls={`cat-body-${category.id}`}
+        className={`w-full text-left flex items-center justify-between gap-3 py-3 cursor-pointer group
           ${isSubcategory ? `border-l-2 pl-4 ${darkMode ? "border-stone-600" : "border-stone-200"}` : ""}`}
         onClick={() => setIsExpanded(!isExpanded)}
       >
@@ -509,12 +567,13 @@ const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
             <ChevronRight size={isSubcategory ? 16 : 22} />
           )}
         </div>
-      </div>
+      </button>
 
       {/* Content */}
       <AnimatePresence>
         {isExpanded && (
           <motion.div
+            id={`cat-body-${category.id}`}
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
@@ -650,6 +709,7 @@ export default function MenuView() {
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [menu, setMenu] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [language, setLanguage] = useState<Language>("MK");
   const [searchQuery, setSearchQuery] = useState("");
@@ -721,6 +781,8 @@ export default function MenuView() {
 
   const fetchData = useCallback(async () => {
     if (!slug) return;
+    setLoading(true);
+    setLoadError("");
     try {
       const res = await fetch(`/api/public-menu/${slug}`);
       if (!res.ok) throw new Error(`Failed to load menu (${res.status})`);
@@ -729,6 +791,13 @@ export default function MenuView() {
       setMenu(data.menu || []);
     } catch (error) {
       console.error("Error fetching data:", error);
+      setRestaurant(null);
+      setMenu([]);
+      setLoadError(
+        error instanceof Error
+          ? error.message
+          : "Could not load this menu. Please try again.",
+      );
     } finally {
       setLoading(false);
     }
@@ -755,11 +824,23 @@ export default function MenuView() {
 
   // ── Loading state
   if (loading)
+    return <MenuSkeleton darkMode={darkMode} />;
+
+  if (loadError)
     return (
       <div
-        className={`min-h-screen flex items-center justify-center ${darkMode ? "bg-stone-900" : "bg-stone-50"}`}
+        className={`min-h-screen flex flex-col items-center justify-center p-8 text-center ${darkMode ? "bg-stone-900 text-stone-100" : "bg-stone-50 text-stone-900"}`}
       >
-        <div className="w-8 h-8 border-4 border-stone-200 border-t-stone-900 rounded-full animate-spin" />
+        <AlertCircle size={36} className="mb-4 text-red-500" />
+        <h1 className="text-3xl font-serif mb-3">Menu could not load</h1>
+        <p className="max-w-sm text-stone-500 mb-6">{loadError}</p>
+        <button
+          type="button"
+          onClick={fetchData}
+          className="rounded-xl bg-stone-900 px-5 py-3 text-sm font-bold uppercase tracking-widest text-stone-50 hover:bg-stone-800"
+        >
+          Try Again
+        </button>
       </div>
     );
 
@@ -812,8 +893,9 @@ export default function MenuView() {
                   darkMode
                     ? "bg-stone-800/90 border-stone-700 text-stone-400 hover:text-stone-100"
                     : "bg-white/80 border-stone-200 text-stone-400 hover:text-stone-900"
-                }`}
+              }`}
               title={t("back_to_admin", language)}
+              aria-label={t("back_to_admin", language)}
             >
               <Settings size={18} />
             </Link>
@@ -828,6 +910,7 @@ export default function MenuView() {
                   : "bg-white/80 border-stone-200 text-stone-400 hover:text-stone-900"
               }`}
             title="Toggle Dark Mode"
+            aria-label="Toggle dark mode"
           >
             {darkMode ? <Sun size={18} /> : <Moon size={18} />}
           </button>
@@ -840,8 +923,9 @@ export default function MenuView() {
                   darkMode
                     ? "bg-stone-800/90 border-stone-700 text-stone-400 hover:text-stone-100"
                     : "bg-white/80 border-stone-200 text-stone-400 hover:text-stone-900"
-                }`}
+              }`}
               title="WiFi Password"
+              aria-label="Show WiFi password"
             >
               <Wifi size={18} />
             </button>
@@ -857,8 +941,9 @@ export default function MenuView() {
                   darkMode
                     ? "bg-stone-800/90 border-stone-700 text-stone-400 hover:text-blue-400"
                     : "bg-white/80 border-stone-200 text-stone-400 hover:text-[#1877F2]"
-                }`}
+              }`}
               title="Facebook"
+              aria-label="Open Facebook page"
             >
               <svg
                 viewBox="0 0 24 24"
@@ -881,8 +966,9 @@ export default function MenuView() {
                   darkMode
                     ? "bg-stone-800/90 border-stone-700 text-stone-400 hover:text-pink-400"
                     : "bg-white/80 border-stone-200 text-stone-400 hover:text-[#E1306C]"
-                }`}
+              }`}
               title="Instagram"
+              aria-label="Open Instagram page"
             >
               <svg
                 viewBox="0 0 24 24"
@@ -914,6 +1000,7 @@ export default function MenuView() {
                   : "bg-white/80 border-stone-200 text-stone-400 hover:text-stone-900"
               }`}
             title="Search"
+            aria-label={showSearch ? "Close search" : "Open search"}
           >
             {showSearch ? <X size={18} /> : <Search size={18} />}
           </button>
@@ -927,6 +1014,7 @@ export default function MenuView() {
               <button
                 key={l}
                 onClick={() => setLanguage(l)}
+                aria-label={`Switch language to ${l}`}
                 className={`px-3 py-1.5 rounded-full text-[10px] font-bold tracking-wider transition-all
                   ${
                     language === l
@@ -972,8 +1060,10 @@ export default function MenuView() {
                 />
                 {searchQuery && (
                   <button
+                    type="button"
                     onClick={() => setSearchQuery("")}
                     className="text-stone-400 hover:text-stone-600"
+                    aria-label="Clear search"
                   >
                     <X size={16} />
                   </button>
@@ -1145,6 +1235,7 @@ export default function MenuView() {
                     rel="noopener noreferrer"
                     className={`transition-all hover:scale-110 ${darkMode || restaurant.background_url ? "text-stone-300 hover:text-white" : "text-stone-500 hover:text-[#1877F2]"}`}
                     title="Facebook"
+                    aria-label="Open Facebook page"
                   >
                     <svg
                       viewBox="0 0 24 24"
@@ -1163,6 +1254,7 @@ export default function MenuView() {
                     rel="noopener noreferrer"
                     className={`transition-all hover:scale-110 ${darkMode || restaurant.background_url ? "text-stone-300 hover:text-white" : "text-stone-500 hover:text-[#E1306C]"}`}
                     title="Instagram"
+                    aria-label="Open Instagram page"
                   >
                     <svg
                       viewBox="0 0 24 24"
@@ -1194,8 +1286,12 @@ export default function MenuView() {
         <main className="max-w-2xl mx-auto px-4 md:px-6 pb-28 pt-4">
           {menu.length === 0 ? (
             <div className="text-center py-20">
+              <p className="text-4xl mb-4">Menu</p>
               <p className={darkMode ? "text-stone-500" : "text-stone-400"}>
                 {t("updated", language)}
+              </p>
+              <p className={`mt-2 text-sm ${darkMode ? "text-stone-600" : "text-stone-400"}`}>
+                Please check again soon.
               </p>
             </div>
           ) : normalizedSearchQuery && !hasSearchResults ? (
@@ -1209,6 +1305,20 @@ export default function MenuView() {
                 {t("no_results", language)} "
                 <span className="font-medium">{searchQuery}</span>"
               </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery("");
+                  searchInputRef.current?.focus();
+                }}
+                className={`mt-5 rounded-xl px-4 py-2 text-xs font-bold uppercase tracking-widest ${
+                  darkMode
+                    ? "bg-stone-800 text-stone-200 hover:bg-stone-700"
+                    : "bg-stone-900 text-stone-50 hover:bg-stone-800"
+                }`}
+              >
+                Clear Search
+              </button>
             </motion.div>
           ) : (
             <div className="space-y-1">
@@ -1304,6 +1414,7 @@ export default function MenuView() {
                     rel="noopener noreferrer"
                     className={`transition-all hover:scale-110 ${darkMode ? "text-stone-400 hover:text-blue-400" : "text-stone-400 hover:text-[#1877F2]"}`}
                     title="Facebook"
+                    aria-label="Open Facebook page"
                   >
                     <svg
                       viewBox="0 0 24 24"
@@ -1322,6 +1433,7 @@ export default function MenuView() {
                     rel="noopener noreferrer"
                     className={`transition-all hover:scale-110 ${darkMode ? "text-stone-400 hover:text-pink-400" : "text-stone-400 hover:text-[#E1306C]"}`}
                     title="Instagram"
+                    aria-label="Open Instagram page"
                   >
                     <svg
                       viewBox="0 0 24 24"
@@ -1361,6 +1473,7 @@ export default function MenuView() {
               className={`fixed bottom-6 right-6 z-50 p-3 rounded-full shadow-lg border transition-colors
                 ${darkMode ? "bg-stone-800 border-stone-700 text-stone-300 hover:bg-stone-700" : "bg-white border-stone-200 text-stone-600 hover:bg-stone-100"}`}
               title="Back to top"
+              aria-label="Back to top"
             >
               <ChevronUp size={20} />
             </motion.button>
