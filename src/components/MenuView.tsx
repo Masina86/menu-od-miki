@@ -832,7 +832,9 @@ export default function MenuView() {
     setLoading(true);
     setLoadError("");
     try {
-      const res = await fetch(`/api/public-menu/${slug}`);
+      const res = await fetch(`/api/public-menu/${slug}`, {
+        cache: "no-store",
+      });
       if (!res.ok) throw new Error(`Failed to load menu (${res.status})`);
       const data = await res.json();
       setRestaurant(data.restaurant);

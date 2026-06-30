@@ -38,6 +38,30 @@ interface Notice {
 
 type ProductFormData = Omit<Product, "id" | "category_id" | "sort_order">;
 
+const ACCEPTED_IMAGE_FORMATS = [
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".webp",
+  ".gif",
+  ".svg",
+  ".avif",
+  ".bmp",
+  ".ico",
+  ".tif",
+  ".tiff",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "image/svg+xml",
+  "image/avif",
+  "image/bmp",
+  "image/x-icon",
+  "image/vnd.microsoft.icon",
+  "image/tiff",
+].join(",");
+
 const isValidOptionalUrl = (value: string) => {
   const trimmed = value.trim();
   if (!trimmed || trimmed.startsWith("data:image/")) return true;
@@ -898,7 +922,7 @@ const CategorySection: React.FC<CategorySectionProps> = ({
               <div className="flex items-center gap-4">
                 <input
                   type="file"
-                  accept="image/*"
+                  accept={ACCEPTED_IMAGE_FORMATS}
                   onChange={handleCategoryImageUpload}
                   className="text-xs text-stone-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-stone-100 file:text-stone-700 hover:file:bg-stone-200"
                 />
@@ -1433,7 +1457,7 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                     <div className="flex items-center gap-4">
                       <input
                         type="file"
-                        accept="image/*"
+                        accept={ACCEPTED_IMAGE_FORMATS}
                         onChange={handleImageUpload}
                         className="text-xs text-stone-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-stone-100 file:text-stone-700 hover:file:bg-stone-200"
                       />
@@ -2211,7 +2235,17 @@ export default function AdminPanel() {
 
   const updateRestaurantInfo = async () => {
     if (!restaurant) return;
-    if (!editRestaurantName.trim()) {
+    const trimmedRestaurantName = editRestaurantName.trim();
+    const trimmedBackgroundUrl = backgroundUrl.trim();
+    const trimmedLogoUrl = logoUrl.trim();
+    const trimmedPhone = phone.trim();
+    const trimmedAddress = address.trim();
+    const trimmedWifiPassword = wifiPassword.trim();
+    const trimmedOpeningHours = openingHours.trim();
+    const trimmedFacebookUrl = facebookUrl.trim();
+    const trimmedInstagramUrl = instagramUrl.trim();
+
+    if (!trimmedRestaurantName) {
       setAdminNotice({
         type: "error",
         message: "Restaurant name is required.",
@@ -2219,10 +2253,10 @@ export default function AdminPanel() {
       return;
     }
     const urlFields = [
-      ["logo", logoUrl],
-      ["hero background", backgroundUrl],
-      ["Facebook", facebookUrl],
-      ["Instagram", instagramUrl],
+      ["logo", trimmedLogoUrl],
+      ["hero background", trimmedBackgroundUrl],
+      ["Facebook", trimmedFacebookUrl],
+      ["Instagram", trimmedInstagramUrl],
     ] as const;
     const invalidUrl = urlFields.find(([, value]) => !isValidOptionalUrl(value));
     if (invalidUrl) {
@@ -2237,28 +2271,28 @@ export default function AdminPanel() {
     setAdminNotice({ type: "info", message: "Saving restaurant info..." });
     try {
       await jsonRequest(`/api/restaurant/${restaurant.id}`, "PUT", {
-          name: editRestaurantName,
-          background_url: backgroundUrl,
-          logo_url: logoUrl,
-          phone,
-          address,
-          wifi_password: wifiPassword,
-          opening_hours: openingHours,
-          facebook_url: facebookUrl,
-          instagram_url: instagramUrl,
+        name: trimmedRestaurantName,
+        background_url: trimmedBackgroundUrl,
+        logo_url: trimmedLogoUrl,
+        phone: trimmedPhone,
+        address: trimmedAddress,
+        wifi_password: trimmedWifiPassword,
+        opening_hours: trimmedOpeningHours,
+        facebook_url: trimmedFacebookUrl,
+        instagram_url: trimmedInstagramUrl,
       });
 
       setRestaurant({
         ...restaurant,
-        name: editRestaurantName,
-        background_url: backgroundUrl,
-        logo_url: logoUrl,
-        phone,
-        address,
-        wifi_password: wifiPassword,
-        opening_hours: openingHours,
-        facebook_url: facebookUrl,
-        instagram_url: instagramUrl,
+        name: trimmedRestaurantName,
+        background_url: trimmedBackgroundUrl,
+        logo_url: trimmedLogoUrl,
+        phone: trimmedPhone,
+        address: trimmedAddress,
+        wifi_password: trimmedWifiPassword,
+        opening_hours: trimmedOpeningHours,
+        facebook_url: trimmedFacebookUrl,
+        instagram_url: trimmedInstagramUrl,
       });
       setIsEditingRestaurant(false);
       setAdminNotice({
@@ -2545,7 +2579,7 @@ export default function AdminPanel() {
                               Change
                               <input
                                 type="file"
-                                accept="image/*"
+                                accept={ACCEPTED_IMAGE_FORMATS}
                                 className="opacity-0 absolute inset-0 cursor-pointer w-full h-full"
                                 onChange={handleLogoUpload}
                               />
@@ -2557,7 +2591,7 @@ export default function AdminPanel() {
                             {/* File input only covers the empty state area */}
                             <input
                               type="file"
-                              accept="image/*"
+                              accept={ACCEPTED_IMAGE_FORMATS}
                               className="absolute inset-0 opacity-0 cursor-pointer"
                               onChange={handleLogoUpload}
                             />
@@ -2608,7 +2642,7 @@ export default function AdminPanel() {
                               Change
                               <input
                                 type="file"
-                                accept="image/*"
+                                accept={ACCEPTED_IMAGE_FORMATS}
                                 className="opacity-0 absolute inset-0 cursor-pointer w-full h-full"
                                 onChange={handleBackgroundUpload}
                               />
@@ -2620,7 +2654,7 @@ export default function AdminPanel() {
                             {/* File input only covers the empty state area */}
                             <input
                               type="file"
-                              accept="image/*"
+                              accept={ACCEPTED_IMAGE_FORMATS}
                               className="absolute inset-0 opacity-0 cursor-pointer"
                               onChange={handleBackgroundUpload}
                             />

@@ -183,6 +183,7 @@ async function startServer() {
   }
 
   const isBlank = (v: any) => v == null || String(v).trim() === "";
+  const optionalText = (v: any) => (isBlank(v) ? null : String(v).trim());
 
   const translateText = async (text: string, target: "EN" | "BG") => {
     const trimmed = (text ?? "").trim();
@@ -381,6 +382,9 @@ async function startServer() {
     res.send(body);
   };
 
+  const imageVersion = (imageUrl: string) =>
+    crypto.createHash("sha1").update(imageUrl).digest("hex").slice(0, 12);
+
   const compactImageUrl = (
     type: "categories" | "products" | "restaurants",
     id: number,
@@ -390,9 +394,10 @@ async function startServer() {
     if (!imageUrl) return imageUrl;
     if (!imageUrl.startsWith("data:") || imageUrl.length < 2048) return imageUrl;
     if (type === "categories" && imageUrl.length > 500_000) return null;
+    const version = imageVersion(imageUrl);
     return type === "restaurants"
-      ? `/api/images/restaurants/${id}/${field}`
-      : `/api/images/${type}/${id}`;
+      ? `/api/images/restaurants/${id}/${field}?v=${version}`
+      : `/api/images/${type}/${id}?v=${version}`;
   };
 
   const getOrCreateRestaurantBySlug = (slug: string) => {
@@ -569,15 +574,15 @@ async function startServer() {
           "UPDATE restaurants SET name = ?, background_url = ?, logo_url = ?, phone = ?, address = ?, wifi_password = ?, opening_hours = ?, facebook_url = ?, instagram_url = ? WHERE id = ?",
         )
         .run(
-          name,
-          background_url || null,
-          logo_url || null,
-          phone || null,
-          address || null,
-          wifi_password || null,
-          opening_hours || null,
-          facebook_url || null,
-          instagram_url || null,
+          String(name ?? "").trim(),
+          optionalText(background_url),
+          optionalText(logo_url),
+          optionalText(phone),
+          optionalText(address),
+          optionalText(wifi_password),
+          optionalText(opening_hours),
+          optionalText(facebook_url),
+          optionalText(instagram_url),
           id,
         );
 
@@ -608,10 +613,7 @@ async function startServer() {
       ),
     };
     const menu = buildMenu(restaurant.id, true);
-    res.setHeader(
-      "Cache-Control",
-      "public, max-age=30, stale-while-revalidate=300",
-    );
+    res.setHeader("Cache-Control", "no-store");
     res.json(toJSON({ restaurant: publicRestaurant, menu }));
   });
 
