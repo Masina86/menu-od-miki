@@ -580,7 +580,7 @@ const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
         <div className="flex items-center gap-3 flex-1 min-w-0">
           {categoryThumbSrc ? (
             <span
-              className={`relative flex-shrink-0 rounded-full shadow-sm ${
+              className={`relative flex-shrink-0 rounded-lg shadow-sm ${
                 darkMode ? "ring-1 ring-white/15" : "ring-1 ring-stone-200"
               }`}
             >
@@ -590,12 +590,12 @@ const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
                 loading="lazy"
                 decoding="async"
                 onError={() => setCategoryImageFailed(true)}
-                className={`${isSubcategory ? "w-7 h-7" : "w-12 h-12"} rounded-full object-cover border border-white/60`}
+                className={`${isSubcategory ? "w-7 h-7" : "w-12 h-12"} rounded-lg object-cover border border-white/60`}
               />
             </span>
           ) : !isSubcategory ? (
             <span
-              className={`w-12 h-12 rounded-full border border-white/60 flex-shrink-0 inline-flex items-center justify-center text-sm font-bold shadow-sm
+              className={`w-12 h-12 rounded-lg border border-white/60 flex-shrink-0 inline-flex items-center justify-center text-sm font-bold shadow-sm
                 ${darkMode ? "bg-stone-800 text-stone-500 ring-1 ring-white/10" : "bg-stone-100 text-stone-400 ring-1 ring-stone-200"}`}
               aria-hidden="true"
             >
@@ -603,7 +603,7 @@ const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
             </span>
           ) : (
             <span
-              className={`w-7 h-7 rounded-full border flex-shrink-0 inline-flex items-center justify-center text-[10px] font-bold
+              className={`w-7 h-7 rounded-lg border flex-shrink-0 inline-flex items-center justify-center text-[10px] font-bold
                 ${darkMode ? "bg-stone-800 border-stone-700 text-stone-500" : "bg-stone-100 border-stone-200 text-stone-400"}`}
               aria-hidden="true"
             >
@@ -618,14 +618,7 @@ const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
             {name}
           </h2>
         </div>
-        {!isSubcategory && totalProducts > 0 && (
-          <span
-            className={`hidden min-[380px]:inline-flex flex-shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider
-              ${darkMode ? "border-stone-700 bg-stone-800/60 text-stone-400" : "border-stone-200 bg-stone-50 text-stone-500"}`}
-          >
-            {totalProducts}
-          </span>
-        )}
+
         <div
           className={`transition-colors flex-shrink-0 ${darkMode ? "text-stone-500 group-hover:text-stone-200" : "text-stone-300 group-hover:text-stone-900"}`}
         >
