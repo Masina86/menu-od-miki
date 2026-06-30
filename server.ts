@@ -966,8 +966,8 @@ async function startServer() {
         .prepare("SELECT * FROM products WHERE id = ?")
         .get(productId) as any;
 
-      const baseName = !isBlank(name) ? String(name) : String(existing?.name ?? "");
-      const baseDesc = !isBlank(description)
+      const baseName = name !== undefined ? String(name) : String(existing?.name ?? "");
+      const baseDesc = description !== undefined
         ? String(description)
         : String(existing?.description ?? "");
 
