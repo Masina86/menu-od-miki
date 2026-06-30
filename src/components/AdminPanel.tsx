@@ -2278,28 +2278,32 @@ export default function AdminPanel() {
 
   const handleBackgroundUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    const target = e.target;
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
         setBackgroundUrl(reader.result as string);
+        target.value = "";
       };
       reader.readAsDataURL(file);
+    } else {
+      target.value = "";
     }
-    // Reset so re-selecting the same file fires onChange again
-    e.target.value = "";
   };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    const target = e.target;
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
         setLogoUrl(reader.result as string);
+        target.value = "";
       };
       reader.readAsDataURL(file);
+    } else {
+      target.value = "";
     }
-    // Reset so re-selecting the same file fires onChange again
-    e.target.value = "";
   };
 
   const adminStats = useMemo(() => {
@@ -2542,7 +2546,7 @@ export default function AdminPanel() {
                               <input
                                 type="file"
                                 accept="image/*"
-                                className="hidden"
+                                className="opacity-0 absolute inset-0 cursor-pointer w-full h-full"
                                 onChange={handleLogoUpload}
                               />
                             </label>
@@ -2605,7 +2609,7 @@ export default function AdminPanel() {
                               <input
                                 type="file"
                                 accept="image/*"
-                                className="hidden"
+                                className="opacity-0 absolute inset-0 cursor-pointer w-full h-full"
                                 onChange={handleBackgroundUpload}
                               />
                             </label>
