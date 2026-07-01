@@ -1735,6 +1735,7 @@ export default function AdminPanel() {
   const [facebookUrl, setFacebookUrl] = useState("");
   const [instagramUrl, setInstagramUrl] = useState("");
   const [popularBadgesEnabled, setPopularBadgesEnabled] = useState(true);
+  const [reviewsEnabled, setReviewsEnabled] = useState(true);
   const [popularCategoryStats, setPopularCategoryStats] =
     useState<PopularCategoryStats | null>(null);
   const [adminNotice, setAdminNotice] = useState<Notice | null>(null);
@@ -1909,6 +1910,7 @@ export default function AdminPanel() {
     setFacebookUrl(rest.facebook_url || "");
     setInstagramUrl(rest.instagram_url || "");
     setPopularBadgesEnabled(rest.popular_badges_enabled !== 0);
+    setReviewsEnabled(rest.reviews_enabled !== 0);
   };
 
   const fetchData = async () => {
@@ -2460,6 +2462,43 @@ export default function AdminPanel() {
       setAdminNotice({
         type: "error",
         message: error?.message || "Could not update daily popular category.",
+      });
+    } finally {
+      setSavingAction(null);
+    }
+  };
+
+  const updateReviewsEnabled = async (enabled: boolean) => {
+    if (!restaurant) return;
+    const previous = reviewsEnabled;
+    setReviewsEnabled(enabled);
+    setSavingAction("reviews-enabled");
+    setAdminNotice({
+      type: "info",
+      message: enabled
+        ? "Enabling reviews..."
+        : "Disabling reviews...",
+    });
+    try {
+      await jsonRequest(`/api/restaurant/${restaurant.id}/reviews-enabled`, "PUT", {
+        enabled,
+      });
+      setRestaurant({
+        ...restaurant,
+        reviews_enabled: enabled ? 1 : 0,
+      });
+      setAdminNotice({
+        type: "success",
+        message: enabled
+          ? "Reviews feature enabled."
+          : "Reviews feature disabled.",
+      });
+    } catch (error: any) {
+      console.error("Error updating reviews enabled setting:", error);
+      setReviewsEnabled(previous);
+      setAdminNotice({
+        type: "error",
+        message: error?.message || "Could not update reviews setting.",
       });
     } finally {
       setSavingAction(null);
@@ -3092,6 +3131,40 @@ export default function AdminPanel() {
               {savingAction === "popular-badges"
                 ? "Saving..."
                 : popularBadgesEnabled
+                  ? "Enabled"
+                  : "Disabled"}
+            </button>
+          </div>
+        </section>
+
+        <section className="mb-8 rounded-xl border border-stone-200 bg-white px-4 py-4">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
+                <Star size={17} fill="currentColor" strokeWidth={1.8} />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-stone-900">
+                  Customer Reviews
+                </p>
+                <p className="mt-1 max-w-xl text-xs leading-relaxed text-stone-500">
+                  Enable or disable customer reviews and ratings on your public menu. If enabled, a reviews icon will be shown on the menu, and users can submit star ratings and comments.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => updateReviewsEnabled(!reviewsEnabled)}
+              disabled={savingAction === "reviews-enabled"}
+              className={`inline-flex min-w-28 items-center justify-center rounded-full px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-60 ${
+                reviewsEnabled
+                  ? "bg-stone-900 text-white hover:bg-stone-800"
+                  : "border border-stone-300 bg-white text-stone-500 hover:text-stone-900"
+              }`}
+            >
+              {savingAction === "reviews-enabled"
+                ? "Saving..."
+                : reviewsEnabled
                   ? "Enabled"
                   : "Disabled"}
             </button>

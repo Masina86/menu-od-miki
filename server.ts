@@ -122,6 +122,7 @@ tryAlter("ALTER TABLE restaurants ADD COLUMN popular_badges_enabled INTEGER DEFA
 tryAlter("ALTER TABLE restaurants ADD COLUMN popular_category_id INTEGER");
 tryAlter("ALTER TABLE restaurants ADD COLUMN popular_category_period_key TEXT");
 tryAlter("ALTER TABLE restaurants ADD COLUMN popular_category_updated_at TEXT");
+tryAlter("ALTER TABLE restaurants ADD COLUMN reviews_enabled INTEGER DEFAULT 1");
 
 tryAlter(
   "ALTER TABLE categories ADD COLUMN parent_id INTEGER REFERENCES categories(id) ON DELETE CASCADE",
@@ -418,7 +419,7 @@ async function startServer() {
       req.path.startsWith("/public-menu/") ||
       req.path.startsWith("/popularity/category-view") ||
       req.path.startsWith("/images/") ||
-      req.path.startsWith("/reviews/");
+      (req.path.startsWith("/reviews/") && req.method !== "DELETE");
 
     if (publicApi || isAdminSessionValid(req.headers.cookie)) {
       return next();
@@ -880,6 +881,134 @@ async function startServer() {
       res.json({ success: true, enabled: enabled === 1 });
     } catch (error: any) {
       console.error("[api] Error updating popular badges setting:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ─── REVIEWS ───────────────────────────────────────────────────────────────
+
+  // Simple in-memory rate limiter: max 1 review per IP per 60s
+  const reviewRateLimit = new Map<string, number>();
+
+  // GET reviews for a restaurant (public)
+  app.get("/api/reviews/:restaurantId", (req, res) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      if (!Number.isFinite(restaurantId)) {
+        return res.status(400).json({ error: "Invalid restaurant ID." });
+      }
+      const restaurant = db
+        .prepare("SELECT id, reviews_enabled FROM restaurants WHERE id = ?")
+        .get(restaurantId) as any;
+      if (!restaurant) return res.status(404).json({ error: "Restaurant not found." });
+      if (restaurant.reviews_enabled === 0) {
+        return res.json({ reviews: [], reviews_enabled: false });
+      }
+      const reviews = db
+        .prepare(
+          `SELECT id, author_name, rating, comment, created_at
+           FROM reviews
+           WHERE restaurant_id = ?
+           ORDER BY created_at DESC
+           LIMIT 100`,
+        )
+        .all(restaurantId);
+      res.json({ reviews: toJSON(reviews), reviews_enabled: true });
+    } catch (error: any) {
+      console.error("[api] Error fetching reviews:", error);
+      res.status(500).json({ error: error.message || "Could not load reviews." });
+    }
+  });
+
+  // POST a new review (public, rate-limited)
+  app.post("/api/reviews/:restaurantId", (req, res) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      if (!Number.isFinite(restaurantId)) {
+        return res.status(400).json({ error: "Invalid restaurant ID." });
+      }
+      const restaurant = db
+        .prepare("SELECT id, reviews_enabled FROM restaurants WHERE id = ?")
+        .get(restaurantId) as any;
+      if (!restaurant) return res.status(404).json({ error: "Restaurant not found." });
+      if (restaurant.reviews_enabled === 0) {
+        return res.status(403).json({ error: "Reviews are disabled for this restaurant." });
+      }
+
+      // Rate limiting
+      const ip = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown");
+      const now = Date.now();
+      const lastReview = reviewRateLimit.get(ip);
+      if (lastReview && now - lastReview < 60_000) {
+        return res.status(429).json({ error: "Please wait a moment before submitting another review." });
+      }
+      reviewRateLimit.set(ip, now);
+      if (reviewRateLimit.size > 5000) {
+        reviewRateLimit.forEach((ts, key) => { if (now - ts > 60_000) reviewRateLimit.delete(key); });
+      }
+
+      const { author_name, rating, comment } = req.body;
+      const ratingNum = Number(rating);
+      if (!Number.isFinite(ratingNum) || ratingNum < 1 || ratingNum > 5) {
+        return res.status(400).json({ error: "Rating must be between 1 and 5." });
+      }
+      const trimmedAuthor = String(author_name || "").trim().slice(0, 100);
+      const trimmedComment = String(comment || "").trim().slice(0, 1000);
+
+      const result = db
+        .prepare(
+          `INSERT INTO reviews (restaurant_id, author_name, rating, comment)
+           VALUES (?, ?, ?, ?)`,
+        )
+        .run(restaurantId, trimmedAuthor || "Anonymous", ratingNum, trimmedComment || null);
+
+      const newReview = db
+        .prepare("SELECT id, author_name, rating, comment, created_at FROM reviews WHERE id = ?")
+        .get(typeof result.lastInsertRowid === "bigint" ? Number(result.lastInsertRowid) : result.lastInsertRowid);
+
+      res.status(201).json({ review: toJSON(newReview) });
+    } catch (error: any) {
+      console.error("[api] Error submitting review:", error);
+      res.status(500).json({ error: error.message || "Could not submit review." });
+    }
+  });
+
+  // DELETE a review (admin only)
+  app.delete("/api/reviews/:restaurantId/:reviewId", (req, res) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      const reviewId = Number(req.params.reviewId);
+      if (!Number.isFinite(restaurantId) || !Number.isFinite(reviewId)) {
+        return res.status(400).json({ error: "Invalid IDs." });
+      }
+      const result = db
+        .prepare("DELETE FROM reviews WHERE id = ? AND restaurant_id = ?")
+        .run(reviewId, restaurantId);
+      if (result.changes === 0) {
+        return res.status(404).json({ error: "Review not found." });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[api] Error deleting review:", error);
+      res.status(500).json({ error: error.message || "Could not delete review." });
+    }
+  });
+
+  // PUT toggle reviews_enabled (admin only)
+  app.put("/api/restaurant/:id/reviews-enabled", (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (isNaN(id)) throw new Error("Invalid restaurant ID");
+      const enabled = req.body?.enabled ? 1 : 0;
+      const result = db
+        .prepare("UPDATE restaurants SET reviews_enabled = ? WHERE id = ?")
+        .run(enabled, id);
+      if (result.changes === 0) {
+        return res.status(404).json({ error: "Restaurant not found." });
+      }
+      res.json({ success: true, enabled: enabled === 1 });
+    } catch (error: any) {
+      console.error("[api] Error updating reviews setting:", error);
       res.status(500).json({ error: error.message });
     }
   });

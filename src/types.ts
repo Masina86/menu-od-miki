@@ -61,6 +61,7 @@ export interface Restaurant {
   facebook_url?: string;
   instagram_url?: string;
   popular_badges_enabled?: number;
+  reviews_enabled?: number;
 }
 
 export type Language = "MK" | "BG" | "EN";

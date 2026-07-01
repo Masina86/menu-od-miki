@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import AdminPanel from './components/AdminPanel';
 import MenuView from './components/MenuView';
+import ReviewsPage from './components/ReviewsPage';
 
 export default function App() {
   return (
@@ -12,6 +13,9 @@ export default function App() {
         
         {/* Admin Route */}
         <Route path="/:slug/admin" element={<AdminPanel />} />
+        
+        {/* Reviews Route */}
+        <Route path="/:slug/reviews" element={<ReviewsPage />} />
         
         {/* Customer Route */}
         <Route path="/:slug" element={<MenuView />} />

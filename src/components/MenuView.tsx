@@ -29,6 +29,7 @@ import {
   AlertCircle,
   Clock,
   Send,
+  MessageSquarePlus,
 } from "lucide-react";
 
 const DEFAULT_LOGO_SIZE = 100;
@@ -84,6 +85,8 @@ const TRANSLATIONS: Record<string, Record<Language, string>> = {
   allergens: { MK: "Алергени", BG: "Алергени", EN: "Allergens" },
   calories_unit: { MK: "kcal", BG: "kcal", EN: "kcal" },
   all_categories: { MK: "Сите", BG: "Всички", EN: "All" },
+  reviews: { MK: "Рецензии", BG: "Отзиви", EN: "Reviews" },
+  write_review: { MK: "Напишете рецензија", BG: "Напишете отзив", EN: "Write a Review" },
 };
 
 const t = (key: string, lang: Language): string =>
@@ -1109,17 +1112,33 @@ export default function MenuView() {
           )}
         </div>
 
-        {/* ── Top-right: Search + Language */}
+        {/* ── Top-right: Reviews + Language */}
         <div
           className={`fixed top-4 right-4 z-50 flex items-center gap-2 transition-all duration-300 ${
-            availableLanguages.length > 1 ? "" : "hidden"
-          } ${
             isAtTop
               ? "translate-y-0 opacity-100"
               : "-translate-y-[150%] opacity-0 pointer-events-none md:translate-y-0 md:opacity-100 md:pointer-events-auto"
           }`}
         >
+          {/* Reviews header button */}
+          {restaurant.reviews_enabled !== 0 && (
+            <a
+              href={`/${slug}/reviews?view=list`}
+              className={`min-h-11 inline-flex items-center gap-1.5 px-3 py-2 rounded-full shadow-sm border backdrop-blur-md transition-all hover:scale-105 text-[10px] font-bold uppercase tracking-wider ${
+                darkMode
+                  ? "bg-stone-800/90 border-stone-700 text-amber-400 hover:text-amber-300"
+                  : "bg-white/80 border-stone-200 text-amber-600 hover:text-amber-700"
+              }`}
+              aria-label="View all reviews"
+            >
+              <Star size={14} fill="currentColor" />
+              <span className="hidden sm:inline">{t("reviews", language)}</span>
+            </a>
+          )}
+
           {/* Language switcher */}
+          {availableLanguages.length > 1 && (
+
           <div
             className={`rounded-full p-1 shadow-sm border backdrop-blur-md flex items-center gap-0.5
             ${darkMode ? "bg-stone-800/90 border-stone-700" : "bg-white/80 border-stone-200"}`}
@@ -1144,6 +1163,7 @@ export default function MenuView() {
               </button>
             ))}
           </div>
+          )}
         </div>
 
         {/* ── Search Bar (expandable) */}
