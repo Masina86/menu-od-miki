@@ -29,6 +29,7 @@ import { Restaurant, Category, Product, LogoFit } from "../types";
 import { ImageModal } from "./ImageModal";
 import { AllergenPicker } from "./AllergenIcons";
 import { ApiError, apiRequest, jsonRequest } from "../utils/api";
+import { ImageCropper } from "./ImageCropper";
 
 type NoticeType = "info" | "success" | "error";
 
@@ -2505,13 +2506,17 @@ export default function AdminPanel() {
     }
   };
 
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
+  const [cropTarget, setCropTarget] = useState<"logo" | "background" | null>(null);
+
   const handleBackgroundUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     const target = e.target;
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setBackgroundUrl(reader.result as string);
+        setCropImageSrc(reader.result as string);
+        setCropTarget("background");
         target.value = "";
       };
       reader.readAsDataURL(file);
@@ -2526,7 +2531,8 @@ export default function AdminPanel() {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setLogoUrl(reader.result as string);
+        setCropImageSrc(reader.result as string);
+        setCropTarget("logo");
         target.value = "";
       };
       reader.readAsDataURL(file);
@@ -3254,6 +3260,25 @@ export default function AdminPanel() {
           </Reorder.Group>
         </section>
       </div>
+
+      {cropImageSrc && cropTarget && (
+        <ImageCropper
+          imageSrc={cropImageSrc}
+          onCropComplete={(croppedDataUrl) => {
+            if (cropTarget === "logo") {
+              setLogoUrl(croppedDataUrl);
+            } else if (cropTarget === "background") {
+              setBackgroundUrl(croppedDataUrl);
+            }
+            setCropImageSrc(null);
+            setCropTarget(null);
+          }}
+          onCancel={() => {
+            setCropImageSrc(null);
+            setCropTarget(null);
+          }}
+        />
+      )}
     </div>
   );
 }
