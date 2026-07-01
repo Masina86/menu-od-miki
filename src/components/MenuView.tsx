@@ -1219,9 +1219,13 @@ export default function MenuView() {
         {/* ── Hero */}
         <header
           className={`relative min-h-[360px] sm:min-h-[390px] md:min-h-[400px] lg:h-[38vh] lg:min-h-[380px] flex items-end justify-center overflow-hidden
-          ${darkMode ? "bg-stone-900" : ""}`}
+          ${darkMode ? "bg-stone-900" : restaurant.background_url ? "bg-black" : ""}`}
         >
-          <div className="absolute inset-0 z-0">
+          {/* Full-bleed background layer */}
+          <div
+            className="absolute inset-0 z-0"
+            style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
+          >
             {restaurant.background_url ? (
               <img
                 src={restaurant.background_url}
@@ -1229,7 +1233,15 @@ export default function MenuView() {
                 loading="eager"
                 decoding="async"
                 fetchPriority="high"
-                className="w-full h-full object-cover"
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  objectPosition: "center center",
+                  display: "block",
+                }}
               />
             ) : restaurant.logo_url ? (
               <img

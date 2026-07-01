@@ -3264,6 +3264,7 @@ export default function AdminPanel() {
       {cropImageSrc && cropTarget && (
         <ImageCropper
           imageSrc={cropImageSrc}
+          title={cropTarget === "background" ? "Crop Hero Background" : "Crop Logo"}
           onCropComplete={(croppedDataUrl) => {
             if (cropTarget === "logo") {
               setLogoUrl(croppedDataUrl);
