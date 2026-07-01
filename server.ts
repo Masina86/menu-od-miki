@@ -118,6 +118,10 @@ tryAlter("ALTER TABLE restaurants ADD COLUMN wifi_password TEXT");
 tryAlter("ALTER TABLE restaurants ADD COLUMN opening_hours TEXT");
 tryAlter("ALTER TABLE restaurants ADD COLUMN facebook_url TEXT");
 tryAlter("ALTER TABLE restaurants ADD COLUMN instagram_url TEXT");
+tryAlter("ALTER TABLE restaurants ADD COLUMN popular_badges_enabled INTEGER DEFAULT 1");
+tryAlter("ALTER TABLE restaurants ADD COLUMN popular_category_id INTEGER");
+tryAlter("ALTER TABLE restaurants ADD COLUMN popular_category_period_key TEXT");
+tryAlter("ALTER TABLE restaurants ADD COLUMN popular_category_updated_at TEXT");
 
 tryAlter(
   "ALTER TABLE categories ADD COLUMN parent_id INTEGER REFERENCES categories(id) ON DELETE CASCADE",
@@ -161,6 +165,21 @@ db.exec(`
   );
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS category_view_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    restaurant_id INTEGER NOT NULL,
+    category_id INTEGER NOT NULL,
+    period_key TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE,
+    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_category_view_events_period
+    ON category_view_events (restaurant_id, period_key, category_id);
+`);
+
 async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT || 3000);
@@ -177,6 +196,9 @@ async function startServer() {
     "dev-admin-session-secret";
   const ADMIN_COOKIE = "menu_admin_session";
   const ADMIN_SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+  const POPULARITY_TIME_ZONE =
+    process.env.POPULARITY_TIME_ZONE || "Europe/Skopje";
+  const POPULARITY_CUTOFF_HOUR = 3;
 
   if (!process.env.ADMIN_PASSWORD) {
     console.warn(
@@ -200,6 +222,50 @@ async function startServer() {
   };
   const normalizeLogoFit = (value: any) =>
     value === "cover" ? "cover" : "contain";
+
+  const localDateTimeParts = (date: Date) => {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: POPULARITY_TIME_ZONE,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+      hourCycle: "h23",
+    }).formatToParts(date);
+    const part = (type: string) =>
+      Number(parts.find((item) => item.type === type)?.value || 0);
+    return {
+      year: part("year"),
+      month: part("month"),
+      day: part("day"),
+      hour: part("hour"),
+      minute: part("minute"),
+      second: part("second"),
+    };
+  };
+
+  const formatPeriodKey = (date: Date) => {
+    const { year, month, day } = localDateTimeParts(date);
+    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  };
+
+  const getCurrentPeriodKey = (date = new Date()) => {
+    const local = localDateTimeParts(date);
+    if (local.hour >= POPULARITY_CUTOFF_HOUR) return formatPeriodKey(date);
+    return formatPeriodKey(
+      new Date(date.getTime() - 24 * 60 * 60 * 1000),
+    );
+  };
+
+  const getPreviousPeriodKey = (periodKey: string) => {
+    const periodNoon = new Date(`${periodKey}T12:00:00Z`);
+    return formatPeriodKey(
+      new Date(periodNoon.getTime() - 24 * 60 * 60 * 1000),
+    );
+  };
 
   const translateText = async (text: string, target: "EN" | "BG") => {
     const trimmed = (text ?? "").trim();
@@ -350,6 +416,7 @@ async function startServer() {
     const publicApi =
       req.path.startsWith("/auth/") ||
       req.path.startsWith("/public-menu/") ||
+      req.path.startsWith("/popularity/category-view") ||
       req.path.startsWith("/images/") ||
       req.path.startsWith("/reviews/");
 
@@ -447,10 +514,117 @@ async function startServer() {
         opening_hours: null,
         facebook_url: null,
         instagram_url: null,
+        popular_badges_enabled: 1,
+        popular_category_id: null,
+        popular_category_period_key: null,
+        popular_category_updated_at: null,
       };
     }
 
     return restaurant;
+  };
+
+  const getCategoryById = (categoryId: number, restaurantId: number) =>
+    db
+      .prepare(
+        "SELECT id, name, name_en, name_bg FROM categories WHERE id = ? AND restaurant_id = ?",
+      )
+      .get(categoryId, restaurantId) as any;
+
+  const getPopularCategoryWinner = (restaurantId: number, periodKey: string) =>
+    db
+      .prepare(
+        `SELECT
+           c.id,
+           c.name,
+           c.name_en,
+           c.name_bg,
+           COUNT(e.id) AS views
+         FROM category_view_events e
+         JOIN categories c ON c.id = e.category_id
+         WHERE e.restaurant_id = ?
+           AND e.period_key = ?
+         GROUP BY c.id
+         ORDER BY views DESC, c.sort_order ASC, c.id ASC
+         LIMIT 1`,
+      )
+      .get(restaurantId, periodKey) as any;
+
+  const refreshPopularCategory = (restaurant: any) => {
+    const restaurantId = Number(restaurant.id);
+    const currentPeriodKey = getCurrentPeriodKey();
+    const targetPopularPeriodKey = getPreviousPeriodKey(currentPeriodKey);
+
+    if (restaurant.popular_category_period_key === targetPopularPeriodKey) {
+      return restaurant;
+    }
+
+    const winner = getPopularCategoryWinner(
+      restaurantId,
+      targetPopularPeriodKey,
+    );
+    db.prepare(
+      `UPDATE restaurants
+       SET popular_category_id = ?,
+           popular_category_period_key = ?,
+           popular_category_updated_at = ?
+       WHERE id = ?`,
+    ).run(
+      winner?.id || null,
+      targetPopularPeriodKey,
+      new Date().toISOString(),
+      restaurantId,
+    );
+
+    return {
+      ...restaurant,
+      popular_category_id: winner?.id || null,
+      popular_category_period_key: targetPopularPeriodKey,
+      popular_category_updated_at: new Date().toISOString(),
+    };
+  };
+
+  const getPopularCategoryStats = (restaurantId: number) => {
+    const restaurant = refreshPopularCategory(
+      db.prepare("SELECT * FROM restaurants WHERE id = ?").get(restaurantId) as any,
+    );
+    const currentPeriodKey = getCurrentPeriodKey();
+    const previousPeriodKey = getPreviousPeriodKey(currentPeriodKey);
+    const activeCategory = restaurant.popular_category_id
+      ? getCategoryById(Number(restaurant.popular_category_id), restaurantId)
+      : null;
+    const currentLeader = getPopularCategoryWinner(restaurantId, currentPeriodKey);
+    const previousWinner = getPopularCategoryWinner(restaurantId, previousPeriodKey);
+    const currentViews = db
+      .prepare(
+        `SELECT COUNT(*) AS views
+         FROM category_view_events
+         WHERE restaurant_id = ? AND period_key = ?`,
+      )
+      .get(restaurantId, currentPeriodKey) as any;
+
+    return {
+      enabled: restaurant.popular_badges_enabled !== 0,
+      current_period_key: currentPeriodKey,
+      popular_period_key: previousPeriodKey,
+      cutoff_hour: POPULARITY_CUTOFF_HOUR,
+      time_zone: POPULARITY_TIME_ZONE,
+      active_category: activeCategory,
+      current_leader: currentLeader || null,
+      previous_winner: previousWinner || null,
+      current_period_views: Number(currentViews?.views || 0),
+    };
+  };
+
+  const applyPopularCategory = (menu: any[], restaurant: any) => {
+    if (restaurant.popular_badges_enabled === 0) return menu;
+    const popularCategoryId = Number(restaurant.popular_category_id || 0);
+    const markCategory = (category: any): any => ({
+      ...category,
+      is_popular: category.id === popularCategoryId ? 1 : 0,
+      subcategories: (category.subcategories || []).map(markCategory),
+    });
+    return menu.map(markCategory);
   };
 
   const buildMenu = (restaurantId: string | number, compactImages = false) => {
@@ -624,7 +798,9 @@ async function startServer() {
   // ─── MENU ──────────────────────────────────────────────────────────────────
 
   app.get("/api/public-menu/:slug", (req, res) => {
-    const restaurant = getOrCreateRestaurantBySlug(req.params.slug);
+    const restaurant = refreshPopularCategory(
+      getOrCreateRestaurantBySlug(req.params.slug),
+    );
     const publicRestaurant = {
       ...restaurant,
       background_url: compactImageUrl(
@@ -640,9 +816,72 @@ async function startServer() {
         "logo",
       ),
     };
-    const menu = buildMenu(restaurant.id, true);
+    const menu = applyPopularCategory(buildMenu(restaurant.id, true), restaurant);
     res.setHeader("Cache-Control", "no-store");
     res.json(toJSON({ restaurant: publicRestaurant, menu }));
+  });
+
+  app.post("/api/popularity/category-view", (req, res) => {
+    try {
+      const restaurantId = Number(req.body?.restaurant_id);
+      const categoryId = Number(req.body?.category_id);
+      if (!Number.isFinite(restaurantId) || !Number.isFinite(categoryId)) {
+        return res.status(400).json({ error: "Invalid category view." });
+      }
+      const category = getCategoryById(categoryId, restaurantId);
+      if (!category) return res.status(404).json({ error: "Category not found." });
+
+      db.prepare(
+        `INSERT INTO category_view_events
+           (restaurant_id, category_id, period_key, created_at)
+         VALUES (?, ?, ?, ?)`,
+      ).run(
+        restaurantId,
+        categoryId,
+        getCurrentPeriodKey(),
+        new Date().toISOString(),
+      );
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[api] Error tracking category view:", error);
+      res.status(500).json({ error: error.message || "Could not track view." });
+    }
+  });
+
+  app.get("/api/popularity/category/:restaurantId", (req, res) => {
+    try {
+      const restaurantId = Number(req.params.restaurantId);
+      if (!Number.isFinite(restaurantId)) {
+        return res.status(400).json({ error: "Invalid restaurant ID." });
+      }
+      const restaurant = db
+        .prepare("SELECT id FROM restaurants WHERE id = ?")
+        .get(restaurantId);
+      if (!restaurant) return res.status(404).json({ error: "Restaurant not found." });
+      res.json(toJSON(getPopularCategoryStats(restaurantId)));
+    } catch (error: any) {
+      console.error("[api] Error loading category popularity:", error);
+      res.status(500).json({ error: error.message || "Could not load popularity." });
+    }
+  });
+
+  app.put("/api/restaurant/:id/popular-badges", (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (isNaN(id)) throw new Error("Invalid restaurant ID");
+      const enabled = req.body?.enabled ? 1 : 0;
+      const result = db
+        .prepare("UPDATE restaurants SET popular_badges_enabled = ? WHERE id = ?")
+        .run(enabled, id);
+      if (result.changes === 0) {
+        return res.status(404).json({ error: "Restaurant not found." });
+      }
+      res.json({ success: true, enabled: enabled === 1 });
+    } catch (error: any) {
+      console.error("[api] Error updating popular badges setting:", error);
+      res.status(500).json({ error: error.message });
+    }
   });
 
   app.get("/api/images/categories/:id", (req, res) => {

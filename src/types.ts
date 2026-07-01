@@ -39,6 +39,7 @@ export interface Category {
   subcategories?: Category[];
   parent_id?: number | null;
   sort_order?: number;
+  is_popular?: number;
 }
 
 export type LogoFit = "contain" | "cover";
@@ -59,6 +60,7 @@ export interface Restaurant {
   opening_hours?: string; // JSON string: { mon: "08:00-22:00", ... }
   facebook_url?: string;
   instagram_url?: string;
+  popular_badges_enabled?: number;
 }
 
 export type Language = "MK" | "BG" | "EN";

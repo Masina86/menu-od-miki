@@ -247,6 +247,17 @@ const DietaryBadge: React.FC<{ tag: string }> = ({ tag }) => {
   );
 };
 
+const PopularBadge: React.FC<{ compact?: boolean }> = ({ compact = false }) => (
+  <span
+    className={`inline-flex flex-shrink-0 items-center gap-1 rounded-full border border-amber-200 bg-amber-100 font-bold uppercase tracking-wider text-amber-700 ${
+      compact ? "px-2 py-0.5 text-[9px]" : "px-2.5 py-1 text-[10px]"
+    }`}
+  >
+    <Star size={compact ? 9 : 11} fill="currentColor" strokeWidth={1.8} />
+    <span>Popular</span>
+  </span>
+);
+
 const MenuSkeleton: React.FC<{ darkMode: boolean }> = ({ darkMode }) => (
   <div
     className={`min-h-screen px-4 py-8 ${darkMode ? "bg-stone-900" : "bg-[#fcfbf7]"}`}
@@ -304,7 +315,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
 }) => {
   const [imageFailed, setImageFailed] = useState(false);
   const isAvailable = product.is_available !== 0;
-  const isFeatured = product.is_featured === 1;
   const isNew = product.is_new === 1;
   const tags = getTagList(product.tags);
   const allergens = getAllergenList(product.allergens);
@@ -378,13 +388,8 @@ const ProductCard: React.FC<ProductCardProps> = ({
       {/* Content */}
       <div className="flex-1 min-w-0">
         {/* Badges row */}
-        {(isFeatured || isNew || !isAvailable) && (
+        {(isNew || !isAvailable) && (
           <div className="flex flex-wrap gap-1 mb-1.5">
-            {isFeatured && (
-              <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
-                <Star size={9} /> {t("featured", language)}
-              </span>
-            )}
             {isNew && (
               <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">
                 <Sparkles size={9} /> {t("new_item", language)}
@@ -515,6 +520,7 @@ interface CategoryDisplayProps {
   category: Category;
   idx: number;
   onProductSelect: (product: Product) => void;
+  onCategoryView: (category: Category) => void;
   isSubcategory?: boolean;
   language: Language;
   darkMode: boolean;
@@ -525,6 +531,7 @@ const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
   category,
   idx,
   onProductSelect,
+  onCategoryView,
   isSubcategory = false,
   language,
   darkMode,
@@ -533,6 +540,7 @@ const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
   const [isExpanded, setIsExpanded] = useState(isSubcategory);
   const [categoryImageFailed, setCategoryImageFailed] = useState(false);
   const name = getLangValue(category, "name", language);
+  const isPopularCategory = category.is_popular === 1;
   const normalizedQuery = normalizeSearchQuery(searchQuery);
   const categoryThumbSrc =
     !categoryImageFailed &&
@@ -595,7 +603,10 @@ const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
               ? `border-l-2 pl-4 py-2.5 ${darkMode ? "border-stone-600" : "border-stone-200"}`
               : "py-3"
           }`}
-        onClick={() => setIsExpanded(!isExpanded)}
+        onClick={() => {
+          if (!isExpanded) onCategoryView(category);
+          setIsExpanded(!isExpanded);
+        }}
       >
         <div className="flex items-center gap-3 flex-1 min-w-0">
           {categoryThumbSrc ? (
@@ -639,14 +650,17 @@ const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
           </h2>
         </div>
 
-        <div
-          className={`transition-colors flex-shrink-0 ${darkMode ? "text-stone-500 group-hover:text-stone-200" : "text-stone-300 group-hover:text-stone-900"}`}
-        >
+        <div className="flex flex-shrink-0 items-center gap-2">
+          {isPopularCategory && <PopularBadge compact />}
+          <span
+            className={`transition-colors ${darkMode ? "text-stone-500 group-hover:text-stone-200" : "text-stone-300 group-hover:text-stone-900"}`}
+          >
           {isExpanded ? (
             <ChevronDown size={isSubcategory ? 16 : 22} />
           ) : (
             <ChevronRight size={isSubcategory ? 16 : 22} />
           )}
+          </span>
         </div>
       </button>
 
@@ -671,6 +685,7 @@ const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
                       category={sub}
                       idx={sIdx}
                       onProductSelect={onProductSelect}
+                      onCategoryView={onCategoryView}
                       isSubcategory={true}
                       language={language}
                       darkMode={darkMode}
@@ -709,6 +724,7 @@ interface CategoryNavProps {
   darkMode: boolean;
   activeId: number | null;
   onCategorySelect: (id: number) => void;
+  onCategoryView: (category: Category) => void;
 }
 
 const CategoryNav: React.FC<CategoryNavProps> = ({
@@ -717,10 +733,13 @@ const CategoryNav: React.FC<CategoryNavProps> = ({
   darkMode,
   activeId,
   onCategorySelect,
+  onCategoryView,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const scrollTo = (id: number) => {
+  const scrollTo = (category: Category) => {
+    const id = category.id;
+    onCategoryView(category);
     const el = document.getElementById(`cat-${id}`);
     if (el) {
       const offset = 104;
@@ -767,7 +786,7 @@ const CategoryNav: React.FC<CategoryNavProps> = ({
                 key={cat.id}
                 data-cat={cat.id}
                 type="button"
-                onClick={() => scrollTo(cat.id)}
+                onClick={() => scrollTo(cat)}
                 aria-current={isActive ? "true" : undefined}
                 title={getLangValue(cat, "name", language)}
                 className={`min-h-8 md:min-h-11 flex-shrink-0 rounded-full px-3 md:px-4 py-1 md:py-2 border text-[10px] md:text-xs font-bold uppercase tracking-wide md:tracking-wider transition-colors whitespace-nowrap
@@ -1015,6 +1034,20 @@ export default function MenuView() {
   const searchInputRef = { current: null } as React.RefObject<HTMLInputElement>;
   const normalizedSearchQuery = "";
   const hasSearchResults = true;
+  const trackCategoryView = (category: Category) => {
+    if (!restaurant || restaurant.popular_badges_enabled === 0) return;
+    fetch("/api/popularity/category-view", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        restaurant_id: restaurant.id,
+        category_id: category.id,
+      }),
+      keepalive: true,
+    }).catch((error) => {
+      console.error("Error tracking category view:", error);
+    });
+  };
 
   return (
     <div
@@ -1327,6 +1360,7 @@ export default function MenuView() {
           darkMode={darkMode}
           activeId={activeCategoryId}
           onCategorySelect={selectCategory}
+          onCategoryView={trackCategoryView}
         />
 
         {/* ── Main Content */}
@@ -1375,6 +1409,7 @@ export default function MenuView() {
                   category={category}
                   idx={idx}
                   onProductSelect={setSelectedProduct}
+                  onCategoryView={trackCategoryView}
                   language={language}
                   darkMode={darkMode}
                   searchQuery={searchQuery}

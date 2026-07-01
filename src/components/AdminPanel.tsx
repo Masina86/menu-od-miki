@@ -22,6 +22,7 @@ import {
   LogOut,
   Eye,
   EyeOff,
+  Star,
 } from "lucide-react";
 import { motion, AnimatePresence, Reorder } from "motion/react";
 import { Restaurant, Category, Product, LogoFit } from "../types";
@@ -34,6 +35,26 @@ type NoticeType = "info" | "success" | "error";
 interface Notice {
   type: NoticeType;
   message: string;
+}
+
+interface PopularCategoryStats {
+  enabled: boolean;
+  current_period_key: string;
+  popular_period_key: string;
+  cutoff_hour: number;
+  time_zone: string;
+  active_category: Pick<Category, "id" | "name" | "name_en" | "name_bg"> | null;
+  current_leader:
+    | (Pick<Category, "id" | "name" | "name_en" | "name_bg"> & {
+        views: number;
+      })
+    | null;
+  previous_winner:
+    | (Pick<Category, "id" | "name" | "name_en" | "name_bg"> & {
+        views: number;
+      })
+    | null;
+  current_period_views: number;
 }
 
 type ProductFormData = Omit<Product, "id" | "category_id" | "sort_order">;
@@ -1713,6 +1734,9 @@ export default function AdminPanel() {
   const [openingHours, setOpeningHours] = useState("");
   const [facebookUrl, setFacebookUrl] = useState("");
   const [instagramUrl, setInstagramUrl] = useState("");
+  const [popularBadgesEnabled, setPopularBadgesEnabled] = useState(true);
+  const [popularCategoryStats, setPopularCategoryStats] =
+    useState<PopularCategoryStats | null>(null);
   const [adminNotice, setAdminNotice] = useState<Notice | null>(null);
   const [reorderNotice, setReorderNotice] = useState<Notice | null>(null);
   const [savingAction, setSavingAction] = useState<string | null>(null);
@@ -1884,6 +1908,7 @@ export default function AdminPanel() {
     setOpeningHours(rest.opening_hours || "");
     setFacebookUrl(rest.facebook_url || "");
     setInstagramUrl(rest.instagram_url || "");
+    setPopularBadgesEnabled(rest.popular_badges_enabled !== 0);
   };
 
   const fetchData = async () => {
@@ -1895,6 +1920,11 @@ export default function AdminPanel() {
 
       const menuData = await apiRequest<Category[]>(`/api/menu/${rest.id}`);
       setMenu(menuData);
+      const popularity = await apiRequest<PopularCategoryStats>(
+        `/api/popularity/category/${rest.id}`,
+      );
+      setPopularCategoryStats(popularity);
+      setPopularBadgesEnabled(popularity.enabled);
     } catch (error: any) {
       if (error instanceof ApiError && error.status === 401) {
         setAuthStatus("unauthenticated");
@@ -2395,6 +2425,47 @@ export default function AdminPanel() {
     }
   };
 
+  const updatePopularBadges = async (enabled: boolean) => {
+    if (!restaurant) return;
+    const previous = popularBadgesEnabled;
+    setPopularBadgesEnabled(enabled);
+    setSavingAction("popular-badges");
+    setAdminNotice({
+      type: "info",
+      message: enabled
+        ? "Enabling daily popular category..."
+        : "Disabling daily popular category...",
+    });
+    try {
+      await jsonRequest(`/api/restaurant/${restaurant.id}/popular-badges`, "PUT", {
+        enabled,
+      });
+      const popularity = await apiRequest<PopularCategoryStats>(
+        `/api/popularity/category/${restaurant.id}`,
+      );
+      setRestaurant({
+        ...restaurant,
+        popular_badges_enabled: enabled ? 1 : 0,
+      });
+      setPopularCategoryStats(popularity);
+      setAdminNotice({
+        type: "success",
+        message: enabled
+          ? "Daily popular category enabled."
+          : "Daily popular category disabled.",
+      });
+    } catch (error: any) {
+      console.error("Error updating popular badges:", error);
+      setPopularBadgesEnabled(previous);
+      setAdminNotice({
+        type: "error",
+        message: error?.message || "Could not update daily popular category.",
+      });
+    } finally {
+      setSavingAction(null);
+    }
+  };
+
   const handleBackgroundUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     const target = e.target;
@@ -2476,6 +2547,10 @@ export default function AdminPanel() {
     objectFit: logoFit,
     objectPosition: logoObjectPosition,
   };
+  const activePopularCategoryName =
+    popularCategoryStats?.active_category?.name || "No winner yet";
+  const currentLeaderName =
+    popularCategoryStats?.current_leader?.name || "No views yet";
 
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900 font-sans p-4 md:p-8">
@@ -2955,6 +3030,71 @@ export default function AdminPanel() {
               No photo
             </p>
             <p className="text-2xl font-serif mt-1">{adminStats.productsWithoutImages}</p>
+          </div>
+        </section>
+
+        <section className="mb-8 rounded-xl border border-stone-200 bg-white px-4 py-4">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
+                <Star size={17} fill="currentColor" strokeWidth={1.8} />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-stone-900">
+                  Daily popular category
+                </p>
+                <p className="mt-1 max-w-xl text-xs leading-relaxed text-stone-500">
+                  Counts category opens from 3:00 to 3:00. After the cutoff, the
+                  most viewed category from the previous window gets the Popular
+                  badge.
+                </p>
+                <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-stone-500 md:grid-cols-3">
+                  <div className="rounded-lg bg-stone-50 px-3 py-2">
+                    <p className="text-[9px] font-bold uppercase tracking-widest text-stone-400">
+                      Active popular
+                    </p>
+                    <p className="mt-1 font-semibold text-stone-900">
+                      {activePopularCategoryName}
+                    </p>
+                  </div>
+                  <div className="rounded-lg bg-stone-50 px-3 py-2">
+                    <p className="text-[9px] font-bold uppercase tracking-widest text-stone-400">
+                      Current leader
+                    </p>
+                    <p className="mt-1 font-semibold text-stone-900">
+                      {currentLeaderName}
+                      {popularCategoryStats?.current_leader?.views
+                        ? ` (${popularCategoryStats.current_leader.views})`
+                        : ""}
+                    </p>
+                  </div>
+                  <div className="rounded-lg bg-stone-50 px-3 py-2">
+                    <p className="text-[9px] font-bold uppercase tracking-widest text-stone-400">
+                      Next update
+                    </p>
+                    <p className="mt-1 font-semibold text-stone-900">
+                      03:00 {popularCategoryStats?.time_zone || "local"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => updatePopularBadges(!popularBadgesEnabled)}
+              disabled={savingAction === "popular-badges"}
+              className={`inline-flex min-w-28 items-center justify-center rounded-full px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-60 ${
+                popularBadgesEnabled
+                  ? "bg-stone-900 text-white hover:bg-stone-800"
+                  : "border border-stone-300 bg-white text-stone-500 hover:text-stone-900"
+              }`}
+            >
+              {savingAction === "popular-badges"
+                ? "Saving..."
+                : popularBadgesEnabled
+                  ? "Enabled"
+                  : "Disabled"}
+            </button>
           </div>
         </section>
 
