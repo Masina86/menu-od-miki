@@ -1165,7 +1165,7 @@ export default function MenuView() {
 
         {/* ── Hero */}
         <header
-          className={`relative min-h-[430px] sm:min-h-[460px] md:min-h-[470px] lg:h-[44vh] lg:min-h-[420px] flex items-end justify-center overflow-hidden
+          className={`relative min-h-[360px] sm:min-h-[390px] md:min-h-[400px] lg:h-[38vh] lg:min-h-[380px] flex items-end justify-center overflow-hidden
           ${darkMode ? "bg-stone-900" : ""}`}
         >
           <div className="absolute inset-0 z-0">
@@ -1208,7 +1208,7 @@ export default function MenuView() {
             variants={heroContainerVariants}
             initial="hidden"
             animate="show"
-            className="relative z-10 w-full max-w-2xl text-center px-4 pt-[calc(env(safe-area-inset-top)+5rem)] pb-[100px] sm:px-6 sm:pt-[calc(env(safe-area-inset-top)+5.5rem)] sm:pb-[116px] md:pb-[100px] lg:pb-[68px]"
+            className="relative z-10 w-full max-w-2xl text-center px-4 pt-[calc(env(safe-area-inset-top)+5rem)] pb-[30px] sm:px-6 sm:pt-[calc(env(safe-area-inset-top)+5.5rem)] sm:pb-[46px] md:pb-[30px] lg:pb-8"
           >
             {restaurant.logo_url ? (
               <motion.img
