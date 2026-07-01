@@ -1208,7 +1208,7 @@ export default function MenuView() {
             variants={heroContainerVariants}
             initial="hidden"
             animate="show"
-            className="relative z-10 w-full max-w-2xl text-center px-4 pt-[calc(env(safe-area-inset-top)+5rem)] pb-7 sm:px-6 sm:pt-[calc(env(safe-area-inset-top)+5.5rem)] sm:pb-9 md:pb-12"
+            className="relative z-10 w-full max-w-2xl text-center px-4 pt-[calc(env(safe-area-inset-top)+5rem)] pb-[100px] sm:px-6 sm:pt-[calc(env(safe-area-inset-top)+5.5rem)] sm:pb-[116px] md:pb-[100px] lg:pb-[68px]"
           >
             {restaurant.logo_url ? (
               <motion.img
