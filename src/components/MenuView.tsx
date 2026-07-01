@@ -984,15 +984,21 @@ export default function MenuView() {
     100,
     DEFAULT_LOGO_POSITION,
   )}%`;
-  const heroLogoStyle: React.CSSProperties = {
-    height: `clamp(${Math.round(120 * logoScale)}px, ${(14 * logoScale).toFixed(
-      1,
-    )}vh, ${Math.round(200 * logoScale)}px)`,
-    width: logoFit === "cover" ? `min(${Math.round(360 * logoScale)}px, 78vw)` : "auto",
-    maxWidth: "78vw",
+  const heroLogoStyle = {
+    "--hero-logo-mobile-height": `clamp(${Math.round(
+      94 * logoScale,
+    )}px, ${(16 * logoScale).toFixed(1)}svh, ${Math.round(150 * logoScale)}px)`,
+    "--hero-logo-tablet-height": `clamp(${Math.round(
+      116 * logoScale,
+    )}px, ${(13 * logoScale).toFixed(1)}svh, ${Math.round(180 * logoScale)}px)`,
+    "--hero-logo-desktop-height": `clamp(${Math.round(
+      120 * logoScale,
+    )}px, ${(14 * logoScale).toFixed(1)}vh, ${Math.round(200 * logoScale)}px)`,
+    width: logoFit === "cover" ? `min(${Math.round(360 * logoScale)}px, 82vw)` : "auto",
+    maxWidth: "82vw",
     objectFit: logoFit,
     objectPosition: logoObjectPosition,
-  };
+  } as React.CSSProperties;
   const footerLogoStyle: React.CSSProperties = {
     height: `${Math.round(112 * logoScale)}px`,
     width: logoFit === "cover" ? `min(${Math.round(260 * logoScale)}px, 70vw)` : "auto",
@@ -1159,7 +1165,7 @@ export default function MenuView() {
 
         {/* ── Hero */}
         <header
-          className={`relative h-[38vh] min-h-[220px] flex items-end justify-center overflow-hidden
+          className={`relative min-h-[430px] sm:min-h-[460px] md:min-h-[470px] lg:h-[44vh] lg:min-h-[420px] flex items-end justify-center overflow-hidden
           ${darkMode ? "bg-stone-900" : ""}`}
         >
           <div className="absolute inset-0 z-0">
@@ -1202,7 +1208,7 @@ export default function MenuView() {
             variants={heroContainerVariants}
             initial="hidden"
             animate="show"
-            className="relative z-10 text-center px-4 pb-10"
+            className="relative z-10 w-full max-w-2xl text-center px-4 pt-[calc(env(safe-area-inset-top)+5rem)] pb-7 sm:px-6 sm:pt-[calc(env(safe-area-inset-top)+5.5rem)] sm:pb-9 md:pb-12"
           >
             {restaurant.logo_url ? (
               <motion.img
@@ -1211,7 +1217,7 @@ export default function MenuView() {
                 alt={restaurant.name}
                 loading="eager"
                 decoding="async"
-                className="mx-auto mb-6 drop-shadow-2xl"
+                className="mx-auto mb-3 h-[var(--hero-logo-mobile-height)] drop-shadow-2xl sm:mb-4 sm:h-[var(--hero-logo-tablet-height)] lg:mb-6 lg:h-[var(--hero-logo-desktop-height)]"
                 style={heroLogoStyle}
               />
             ) : (
@@ -1225,7 +1231,7 @@ export default function MenuView() {
             )}
             <motion.h1
               variants={heroItemVariants}
-              className={`text-4xl md:text-6xl font-serif mb-2
+              className={`text-4xl sm:text-5xl md:text-6xl font-serif mb-1 md:mb-2
               ${darkMode || restaurant.background_url ? "text-stone-100" : "text-stone-900"}`}
             >
               {restaurant.name}
@@ -1233,9 +1239,8 @@ export default function MenuView() {
             {hasInfo && (
               <motion.div
                 variants={heroItemVariants}
-                className={`flex flex-wrap items-center justify-center gap-3 mt-4
+                className={`flex flex-wrap items-center justify-center gap-x-3 gap-y-2 mt-3 text-sm leading-snug sm:text-base md:text-[17px]
                 ${darkMode || restaurant.background_url ? "text-stone-400" : "text-stone-400"}`}
-                style={{ fontSize: "17px" }}
               >
                 {hasPhone && (
                   <a
@@ -1267,7 +1272,7 @@ export default function MenuView() {
               </motion.div>
             )}
             {hasSocial && (
-              <motion.div variants={heroItemVariants} className="flex items-center justify-center gap-4 mt-4">
+              <motion.div variants={heroItemVariants} className="flex items-center justify-center gap-4 mt-3 md:mt-4">
                 {restaurant.facebook_url && (
                   <a
                     href={restaurant.facebook_url}
@@ -1310,7 +1315,7 @@ export default function MenuView() {
             )}
             <motion.div
               variants={heroItemVariants}
-              className={`w-10 h-px mx-auto mt-6 ${darkMode || restaurant.background_url ? "bg-stone-500" : "bg-stone-300"}`}
+              className={`w-10 h-px mx-auto mt-4 md:mt-6 ${darkMode || restaurant.background_url ? "bg-stone-500" : "bg-stone-300"}`}
             />
           </motion.div>
         </header>
