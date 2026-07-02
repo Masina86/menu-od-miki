@@ -24,6 +24,7 @@ import {
   EyeOff,
   Star,
   Wand2,
+  Sparkles,
 } from "lucide-react";
 import { motion, AnimatePresence, Reorder } from "motion/react";
 import { Restaurant, Category, Product, LogoFit } from "../types";
@@ -2977,6 +2978,53 @@ export default function AdminPanel() {
     }
   };
 
+  const saveTakeoverSettings = async () => {
+    if (!restaurant) return;
+    setSavingAction("takeover");
+    setAdminNotice({ type: "info", message: "Saving promo popup settings..." });
+    try {
+      await jsonRequest(`/api/restaurant/${restaurant.id}`, "PUT", {
+        name: restaurant.name,
+        background_url: restaurant.background_url || "",
+        logo_url: restaurant.logo_url || "",
+        logo_size: restaurant.logo_size ?? 100,
+        logo_fit: restaurant.logo_fit ?? "contain",
+        logo_position_x: restaurant.logo_position_x ?? 50,
+        logo_position_y: restaurant.logo_position_y ?? 50,
+        phone: restaurant.phone || "",
+        address: restaurant.address || "",
+        wifi_password: restaurant.wifi_password || "",
+        opening_hours: restaurant.opening_hours || "",
+        facebook_url: restaurant.facebook_url || "",
+        instagram_url: restaurant.instagram_url || "",
+        takeover_enabled: takeoverEnabled ? 1 : 0,
+        takeover_title: takeoverTitle.trim(),
+        takeover_message: takeoverMessage.trim(),
+        takeover_price: takeoverPrice.trim(),
+        takeover_allergens: takeoverAllergens.trim(),
+        takeover_image_url: takeoverImageUrl.trim(),
+      });
+      setRestaurant({
+        ...restaurant,
+        takeover_enabled: takeoverEnabled ? 1 : 0,
+        takeover_title: takeoverTitle.trim(),
+        takeover_message: takeoverMessage.trim(),
+        takeover_price: takeoverPrice.trim(),
+        takeover_allergens: takeoverAllergens.trim(),
+        takeover_image_url: takeoverImageUrl.trim(),
+      });
+      setAdminNotice({ type: "success", message: "Promo popup settings saved." });
+    } catch (error: any) {
+      console.error("Error saving takeover settings:", error);
+      setAdminNotice({
+        type: "error",
+        message: error?.message || "Could not save promo popup settings.",
+      });
+    } finally {
+      setSavingAction(null);
+    }
+  };
+
   const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
   const [cropTarget, setCropTarget] = useState<"logo" | "background" | null>(
     null,
@@ -3240,135 +3288,6 @@ export default function AdminPanel() {
                   </div>
                 </div>
 
-                {/* Takeover Promo Settings */}
-                <div className="pt-4 border-t border-stone-100">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-bold text-stone-700">
-                      Special Promo Popup
-                    </h3>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        className="sr-only peer"
-                        checked={takeoverEnabled}
-                        onChange={(e) => setTakeoverEnabled(e.target.checked)}
-                      />
-                      <div className="w-9 h-5 bg-stone-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
-                    </label>
-                  </div>
-
-                  {takeoverEnabled && (
-                    <div className="space-y-4 bg-stone-50 p-4 rounded-xl border border-stone-200">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                          <label className="text-[10px] text-stone-400 font-bold ml-1 uppercase">
-                            Promo Title (Headline)
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="e.g. Special of the day!"
-                            className="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-stone-400"
-                            value={takeoverTitle}
-                            onChange={(e) => setTakeoverTitle(e.target.value)}
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] text-stone-400 font-bold ml-1 uppercase">
-                            Price
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="e.g. 500 MKD"
-                            className="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-stone-400"
-                            value={takeoverPrice}
-                            onChange={(e) => setTakeoverPrice(e.target.value)}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-stone-400 font-bold ml-1 uppercase">
-                          Description
-                        </label>
-                        <textarea
-                          placeholder="Describe the promo..."
-                          className="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-stone-400 min-h-[80px]"
-                          value={takeoverMessage}
-                          onChange={(e) => setTakeoverMessage(e.target.value)}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-[10px] uppercase tracking-widest text-stone-400 font-bold block mb-1">
-                          Allergens
-                        </label>
-                        <AllergenPicker
-                          selected={
-                            takeoverAllergens
-                              ? takeoverAllergens.split(",")
-                              : []
-                          }
-                          onChange={(allergens) =>
-                            setTakeoverAllergens(allergens.join(","))
-                          }
-                        />
-                      </div>
-
-                      <div className="flex flex-col gap-2">
-                        <label className="text-[10px] font-bold text-stone-400 uppercase">
-                          Promo Image
-                        </label>
-                        <div className="flex items-center gap-4">
-                          <div className="relative group bg-white rounded-xl border-2 border-dashed border-stone-200 w-32 h-20 flex items-center justify-center overflow-hidden">
-                            {takeoverImageUrl ? (
-                              <>
-                                <img
-                                  src={takeoverImageUrl}
-                                  alt="Promo"
-                                  className="w-full h-full object-cover"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setTakeoverImageUrl("");
-                                  }}
-                                  className="absolute top-1 right-1 bg-white/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                                  title="Remove image"
-                                >
-                                  <X size={14} />
-                                </button>
-                              </>
-                            ) : (
-                              <ImageIcon className="text-stone-300" size={24} />
-                            )}
-                            {!takeoverImageUrl && (
-                              <input
-                                type="file"
-                                accept={ACCEPTED_IMAGE_FORMATS}
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (!file) return;
-                                  const reader = new FileReader();
-                                  reader.onload = (event) => {
-                                    setTakeoverImageUrl(
-                                      event.target?.result as string,
-                                    );
-                                  };
-                                  reader.readAsDataURL(file);
-                                }}
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                              />
-                            )}
-                          </div>
-                          <div className="text-xs text-stone-500">
-                            Upload an image to show full screen.
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="flex flex-col gap-2">
                     <label className="text-[10px] font-bold text-stone-400 uppercase">
@@ -3823,6 +3742,142 @@ export default function AdminPanel() {
                   ? "Enabled"
                   : "Disabled"}
             </button>
+          </div>
+        </section>
+
+        {/* ── Special Promo Popup ─────────────────────────── */}
+        <section className="mb-8 rounded-xl border border-stone-200 bg-white px-6 py-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-orange-100 text-orange-600">
+                <Sparkles size={17} />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-stone-900">Special Promo Popup</p>
+                <p className="mt-1 max-w-xl text-xs leading-relaxed text-stone-500">
+                  Show a full-screen animated popup when a customer opens the menu. Appears only once per session. Ideal for daily specials, promotions, or announcements.
+                </p>
+              </div>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer ml-4 shrink-0">
+              <input
+                type="checkbox"
+                className="sr-only peer"
+                checked={takeoverEnabled}
+                onChange={(e) => setTakeoverEnabled(e.target.checked)}
+              />
+              <div className="w-11 h-6 bg-stone-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+            </label>
+          </div>
+
+          <div className="space-y-4 pt-4 border-t border-stone-100">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-[10px] text-stone-400 font-bold ml-1 uppercase tracking-widest">Headline</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Special of the day!"
+                  className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-stone-400 focus:bg-white transition-colors"
+                  value={takeoverTitle}
+                  onChange={(e) => setTakeoverTitle(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] text-stone-400 font-bold ml-1 uppercase tracking-widest">Price</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 500 MKD"
+                  className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-stone-400 focus:bg-white transition-colors"
+                  value={takeoverPrice}
+                  onChange={(e) => setTakeoverPrice(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[10px] text-stone-400 font-bold ml-1 uppercase tracking-widest">Description</label>
+              <textarea
+                placeholder="Describe the special..."
+                className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-stone-400 focus:bg-white transition-colors min-h-[80px]"
+                value={takeoverMessage}
+                onChange={(e) => setTakeoverMessage(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase tracking-widest text-stone-400 font-bold block">Allergens</label>
+              <AllergenPicker
+                selected={takeoverAllergens ? takeoverAllergens.split(",") : []}
+                onChange={(allergens) => setTakeoverAllergens(allergens.join(","))}
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Promo Image</label>
+              <div className="flex items-center gap-4">
+                <div className="relative group bg-stone-50 rounded-xl border-2 border-dashed border-stone-200 w-36 h-24 flex items-center justify-center overflow-hidden">
+                  {takeoverImageUrl ? (
+                    <>
+                      <img src={takeoverImageUrl} alt="Promo" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setTakeoverImageUrl(""); }}
+                        className="absolute top-1 right-1 bg-white/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                        title="Remove image"
+                      >
+                        <X size={14} />
+                      </button>
+                      <label
+                        className="absolute bottom-0 inset-x-0 text-center text-[9px] font-semibold bg-black/40 text-white py-0.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                        title="Change image"
+                      >
+                        Change
+                        <input
+                          type="file"
+                          accept={ACCEPTED_IMAGE_FORMATS}
+                          className="opacity-0 absolute inset-0 cursor-pointer w-full h-full"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = (ev) => setTakeoverImageUrl(ev.target?.result as string);
+                            reader.readAsDataURL(file);
+                          }}
+                        />
+                      </label>
+                    </>
+                  ) : (
+                    <>
+                      <ImageIcon className="text-stone-300" size={24} />
+                      <input
+                        type="file"
+                        accept={ACCEPTED_IMAGE_FORMATS}
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = (ev) => setTakeoverImageUrl(ev.target?.result as string);
+                          reader.readAsDataURL(file);
+                        }}
+                      />
+                    </>
+                  )}
+                </div>
+                <p className="text-xs text-stone-500">Click to upload a promo image.<br />It will appear full-screen behind the popup text.</p>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={saveTakeoverSettings}
+                disabled={savingAction === "takeover"}
+                className="bg-stone-900 text-white px-6 py-2 rounded-full text-sm font-bold hover:bg-stone-800 disabled:opacity-60 transition-colors"
+              >
+                {savingAction === "takeover" ? "Saving..." : "Save Promo Settings"}
+              </button>
+            </div>
           </div>
         </section>
 
