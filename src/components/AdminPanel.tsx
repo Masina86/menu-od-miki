@@ -127,7 +127,8 @@ const isValidOptionalUrl = (value: string) => {
   }
 };
 
-const isDataImageUrl = (value: string) => value.trim().startsWith("data:image/");
+const isDataImageUrl = (value: string) =>
+  value.trim().startsWith("data:image/");
 
 const noticeClasses: Record<NoticeType, string> = {
   info: "border-blue-200 bg-blue-50 text-blue-700",
@@ -243,7 +244,11 @@ const TransparentImageButton: React.FC<{
     title="Make image transparent"
     className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border border-stone-200 bg-white/90 text-stone-500 shadow-sm transition-colors hover:bg-white hover:text-stone-900 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
   >
-    {disabled ? <Loader2 size={15} className="animate-spin" /> : <Wand2 size={15} />}
+    {disabled ? (
+      <Loader2 size={15} className="animate-spin" />
+    ) : (
+      <Wand2 size={15} />
+    )}
   </button>
 );
 
@@ -440,7 +445,9 @@ const CategorySection: React.FC<CategorySectionProps> = ({
     useState<Product | null>(null);
   const [transparentDialog, setTransparentDialog] =
     useState<TransparentDialogState | null>(null);
-  const [transparentAction, setTransparentAction] = useState<string | null>(null);
+  const [transparentAction, setTransparentAction] = useState<string | null>(
+    null,
+  );
   const [isApplyingTransparent, setIsApplyingTransparent] = useState(false);
 
   const openTransparentPreview = async (
@@ -455,7 +462,10 @@ const CategorySection: React.FC<CategorySectionProps> = ({
   ) => {
     if (!options.originalUrl) return;
     setTransparentAction(actionKey);
-    setFormNotice({ type: "info", message: "Preparing transparent preview..." });
+    setFormNotice({
+      type: "info",
+      message: "Preparing transparent preview...",
+    });
     try {
       const preview = await jsonRequest<TransparentPreviewResponse>(
         "/api/images/transparent-preview",
@@ -565,7 +575,12 @@ const CategorySection: React.FC<CategorySectionProps> = ({
     });
     try {
       if (editingProduct) {
-        await onUpdateProduct(editingProduct.id, category.id, productData, parentId);
+        await onUpdateProduct(
+          editingProduct.id,
+          category.id,
+          productData,
+          parentId,
+        );
       } else {
         await onAddProduct(category.id, productData, parentId);
       }
@@ -746,7 +761,10 @@ const CategorySection: React.FC<CategorySectionProps> = ({
       try {
         const result = event.target?.result;
         if (!(result instanceof ArrayBuffer)) {
-          setImportStatus({ type: "error", message: "Failed to read the file." });
+          setImportStatus({
+            type: "error",
+            message: "Failed to read the file.",
+          });
           return;
         }
 
@@ -754,7 +772,11 @@ const CategorySection: React.FC<CategorySectionProps> = ({
         let text = "";
         if (bytes[0] === 0xff && bytes[1] === 0xfe) {
           text = new TextDecoder("utf-16le").decode(bytes.subarray(2));
-        } else if (bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
+        } else if (
+          bytes[0] === 0xef &&
+          bytes[1] === 0xbb &&
+          bytes[2] === 0xbf
+        ) {
           text = new TextDecoder("utf-8").decode(bytes.subarray(3));
         } else {
           text = new TextDecoder("utf-8").decode(bytes);
@@ -799,33 +821,43 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                 : ",";
         }
 
-        const headers = lines[firstLineIdx].split(delimiter).map(h => h.trim().toLowerCase());
+        const headers = lines[firstLineIdx]
+          .split(delimiter)
+          .map((h) => h.trim().toLowerCase());
         const findColIdx = (key: string) => {
           const map: Record<string, string[]> = {
-            title: ['title', 'наслов', 'име', 'name', 'производ', 'назив', 'product'],
-            title_en: ['title_en', 'name_en'],
-            title_bg: ['title_bg', 'name_bg'],
-            description: ['description', 'опис', 'детали', 'инфо'],
-            description_en: ['description_en', 'desc_en'],
-            description_bg: ['description_bg', 'desc_bg'],
-            price: ['price', 'цена', 'износ', 'price_mdn'],
-            image: ['image', 'слика', 'image_url', 'фото', 'url'],
-            additions: ['additions', 'додатоци', 'додаток', 'extra']
+            title: [
+              "title",
+              "наслов",
+              "име",
+              "name",
+              "производ",
+              "назив",
+              "product",
+            ],
+            title_en: ["title_en", "name_en"],
+            title_bg: ["title_bg", "name_bg"],
+            description: ["description", "опис", "детали", "инфо"],
+            description_en: ["description_en", "desc_en"],
+            description_bg: ["description_bg", "desc_bg"],
+            price: ["price", "цена", "износ", "price_mdn"],
+            image: ["image", "слика", "image_url", "фото", "url"],
+            additions: ["additions", "додатоци", "додаток", "extra"],
           };
           const matches = map[key] || [key];
-          return headers.findIndex(h => matches.includes(h));
+          return headers.findIndex((h) => matches.includes(h));
         };
 
         const idx = {
-          title: findColIdx('title'),
-          title_en: findColIdx('title_en'),
-          title_bg: findColIdx('title_bg'),
-          desc: findColIdx('description'),
-          desc_en: findColIdx('description_en'),
-          desc_bg: findColIdx('description_bg'),
-          price: findColIdx('price'),
-          img: findColIdx('image'),
-          adds: findColIdx('additions')
+          title: findColIdx("title"),
+          title_en: findColIdx("title_en"),
+          title_bg: findColIdx("title_bg"),
+          desc: findColIdx("description"),
+          desc_en: findColIdx("description_en"),
+          desc_bg: findColIdx("description_bg"),
+          price: findColIdx("price"),
+          img: findColIdx("image"),
+          adds: findColIdx("additions"),
         };
 
         if (idx.title === -1) {
@@ -866,15 +898,15 @@ const CategorySection: React.FC<CategorySectionProps> = ({
             const title = getV(idx.title);
             if (!title) return null;
 
-            const priceStr = getV(idx.price).replace(/[^0-9.]/g, '');
+            const priceStr = getV(idx.price).replace(/[^0-9.]/g, "");
             const additionsStr = getV(idx.adds);
             const additions = additionsStr
               ? additionsStr
-                  .split(';')
+                  .split(";")
                   .map((a) => {
-                    const parts = a.split(':');
+                    const parts = a.split(":");
                     const rawNames = (parts[0] || "").trim();
-                    const nameParts = rawNames.split('|').map((s) => s.trim());
+                    const nameParts = rawNames.split("|").map((s) => s.trim());
                     const name = (nameParts[0] || "").trim();
                     const name_en = (nameParts[1] || "").trim();
                     const name_bg = (nameParts[2] || "").trim();
@@ -884,7 +916,7 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                       name_en,
                       name_bg,
                       price: parts[1]
-                        ? parseFloat(parts[1].replace(/[^0-9.]/g, ''))
+                        ? parseFloat(parts[1].replace(/[^0-9.]/g, ""))
                         : 0,
                     };
                   })
@@ -900,7 +932,7 @@ const CategorySection: React.FC<CategorySectionProps> = ({
               description_bg: getV(idx.desc_bg),
               price: parseFloat(priceStr) || 0,
               image_url: getV(idx.img),
-              additions: additions
+              additions: additions,
             };
           })
           .filter((p) => p !== null);
@@ -972,7 +1004,10 @@ const CategorySection: React.FC<CategorySectionProps> = ({
 
   const handleSaveSubcategory = async () => {
     if (!newSubcategoryName.trim()) {
-      setFormNotice({ type: "error", message: "Subcategory name is required." });
+      setFormNotice({
+        type: "error",
+        message: "Subcategory name is required.",
+      });
       return;
     }
     setFormNotice({ type: "info", message: "Adding subcategory..." });
@@ -1197,21 +1232,26 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                       className="h-10 w-10 rounded-full border border-stone-200 object-cover"
                     />
                     <TransparentImageButton
-                      disabled={transparentAction === `category-form-${category.id}`}
+                      disabled={
+                        transparentAction === `category-form-${category.id}`
+                      }
                       className="absolute -right-3 -top-3 h-6 w-6 rounded-full"
                       onClick={(e) => {
                         e.stopPropagation();
-                        void openTransparentPreview(`category-form-${category.id}`, {
-                          title: "Make category image transparent",
-                          originalUrl: categoryEditData.image_url,
-                          payload: { image_url: categoryEditData.image_url },
-                          applyLabel: "Use preview",
-                          onApply: (imageUrl) =>
-                            setCategoryEditData({
-                              ...categoryEditData,
-                              image_url: imageUrl,
-                            }),
-                        });
+                        void openTransparentPreview(
+                          `category-form-${category.id}`,
+                          {
+                            title: "Make category image transparent",
+                            originalUrl: categoryEditData.image_url,
+                            payload: { image_url: categoryEditData.image_url },
+                            applyLabel: "Use preview",
+                            onApply: (imageUrl) =>
+                              setCategoryEditData({
+                                ...categoryEditData,
+                                image_url: imageUrl,
+                              }),
+                          },
+                        );
                       }}
                     />
                   </div>
@@ -1764,7 +1804,10 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                                 payload: { image_url: newProd.image_url },
                                 applyLabel: "Use preview",
                                 onApply: (imageUrl) =>
-                                  setNewProd({ ...newProd, image_url: imageUrl }),
+                                  setNewProd({
+                                    ...newProd,
+                                    image_url: imageUrl,
+                                  }),
                               });
                             }}
                           />
@@ -1823,23 +1866,28 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                           <Maximize2 size={16} className="text-white" />
                         </div>
                         <TransparentImageButton
-                          disabled={transparentAction === `product-${product.id}`}
+                          disabled={
+                            transparentAction === `product-${product.id}`
+                          }
                           className="absolute -right-2 -top-2 h-7 w-7 rounded-full opacity-0 group-hover/img:opacity-100"
                           onClick={(e) => {
                             e.stopPropagation();
-                            void openTransparentPreview(`product-${product.id}`, {
-                              title: `Make ${product.name} transparent`,
-                              originalUrl: product.image_url || "",
-                              payload: { type: "product", id: product.id },
-                              applyLabel: "Apply",
-                              onApply: (imageUrl) =>
-                                onUpdateProductImage(
-                                  product.id,
-                                  category.id,
-                                  imageUrl,
-                                  parentId,
-                                ),
-                            });
+                            void openTransparentPreview(
+                              `product-${product.id}`,
+                              {
+                                title: `Make ${product.name} transparent`,
+                                originalUrl: product.image_url || "",
+                                payload: { type: "product", id: product.id },
+                                applyLabel: "Apply",
+                                onApply: (imageUrl) =>
+                                  onUpdateProductImage(
+                                    product.id,
+                                    category.id,
+                                    imageUrl,
+                                    parentId,
+                                  ),
+                              },
+                            );
                           }}
                         />
                       </div>
@@ -2028,6 +2076,12 @@ export default function AdminPanel() {
   const [instagramUrl, setInstagramUrl] = useState("");
   const [popularBadgesEnabled, setPopularBadgesEnabled] = useState(true);
   const [reviewsEnabled, setReviewsEnabled] = useState(true);
+  const [takeoverEnabled, setTakeoverEnabled] = useState(false);
+  const [takeoverTitle, setTakeoverTitle] = useState("");
+  const [takeoverMessage, setTakeoverMessage] = useState("");
+  const [takeoverPrice, setTakeoverPrice] = useState("");
+  const [takeoverAllergens, setTakeoverAllergens] = useState("");
+  const [takeoverImageUrl, setTakeoverImageUrl] = useState("");
   const [popularCategoryStats, setPopularCategoryStats] =
     useState<PopularCategoryStats | null>(null);
   const [adminNotice, setAdminNotice] = useState<Notice | null>(null);
@@ -2037,16 +2091,21 @@ export default function AdminPanel() {
   const reorderTimeoutsRef = React.useRef<
     Partial<Record<ReorderType, ReturnType<typeof setTimeout>>>
   >({});
-  const pendingReordersRef = React.useRef<Partial<Record<ReorderType, number[]>>>(
-    {},
-  );
+  const pendingReordersRef = React.useRef<
+    Partial<Record<ReorderType, number[]>>
+  >({});
 
   const saveReorder = async (
     type: ReorderType,
     ids: number[],
     keepalive = false,
   ) => {
-    await jsonRequest<void>(`/api/${type}/reorder`, "PUT", { ids }, { keepalive });
+    await jsonRequest<void>(
+      `/api/${type}/reorder`,
+      "PUT",
+      { ids },
+      { keepalive },
+    );
   };
 
   const debouncedReorder = (type: ReorderType, ids: number[]) => {
@@ -2095,7 +2154,7 @@ export default function AdminPanel() {
   }, []);
 
   useEffect(() => {
-  const checkSession = async () => {
+    const checkSession = async () => {
       try {
         const data = await apiRequest<{ authenticated: boolean }>(
           "/api/auth/session",
@@ -2203,6 +2262,12 @@ export default function AdminPanel() {
     setInstagramUrl(rest.instagram_url || "");
     setPopularBadgesEnabled(rest.popular_badges_enabled !== 0);
     setReviewsEnabled(rest.reviews_enabled !== 0);
+    setTakeoverEnabled(rest.takeover_enabled !== 0);
+    setTakeoverTitle(rest.takeover_title || "");
+    setTakeoverMessage(rest.takeover_message || "");
+    setTakeoverPrice(rest.takeover_price || "");
+    setTakeoverAllergens(rest.takeover_allergens || "");
+    setTakeoverImageUrl(rest.takeover_image_url || "");
   };
 
   const fetchData = async () => {
@@ -2245,9 +2310,9 @@ export default function AdminPanel() {
     setAdminNotice({ type: "info", message: "Adding category..." });
     try {
       const newCat = await jsonRequest<Category>("/api/categories", "POST", {
-          restaurant_id: restaurant.id,
-          name: newCategoryName.trim(),
-          parent_id: null,
+        restaurant_id: restaurant.id,
+        name: newCategoryName.trim(),
+        parent_id: null,
       });
       setMenu([...menu, newCat]);
       setNewCategoryName("");
@@ -2267,9 +2332,9 @@ export default function AdminPanel() {
     if (!restaurant || !name.trim()) return;
     try {
       const newSub = await jsonRequest<Category>("/api/categories", "POST", {
-          restaurant_id: restaurant.id,
-          name: name.trim(),
-          parent_id: parentId,
+        restaurant_id: restaurant.id,
+        name: name.trim(),
+        parent_id: parentId,
       });
       setMenu(
         menu.map((cat) =>
@@ -2748,8 +2813,11 @@ export default function AdminPanel() {
       ["hero background", trimmedBackgroundUrl],
       ["Facebook", trimmedFacebookUrl],
       ["Instagram", trimmedInstagramUrl],
+      ["Takeover image", takeoverImageUrl.trim()],
     ] as const;
-    const invalidUrl = urlFields.find(([, value]) => !isValidOptionalUrl(value));
+    const invalidUrl = urlFields.find(
+      ([, value]) => !isValidOptionalUrl(value),
+    );
     if (invalidUrl) {
       setAdminNotice({
         type: "error",
@@ -2775,6 +2843,12 @@ export default function AdminPanel() {
         opening_hours: trimmedOpeningHours,
         facebook_url: trimmedFacebookUrl,
         instagram_url: trimmedInstagramUrl,
+        takeover_enabled: takeoverEnabled ? 1 : 0,
+        takeover_title: takeoverTitle.trim(),
+        takeover_message: takeoverMessage.trim(),
+        takeover_price: takeoverPrice.trim(),
+        takeover_allergens: takeoverAllergens.trim(),
+        takeover_image_url: takeoverImageUrl.trim(),
       });
 
       setRestaurant({
@@ -2792,6 +2866,12 @@ export default function AdminPanel() {
         opening_hours: trimmedOpeningHours,
         facebook_url: trimmedFacebookUrl,
         instagram_url: trimmedInstagramUrl,
+        takeover_enabled: takeoverEnabled ? 1 : 0,
+        takeover_title: takeoverTitle.trim(),
+        takeover_message: takeoverMessage.trim(),
+        takeover_price: takeoverPrice.trim(),
+        takeover_allergens: takeoverAllergens.trim(),
+        takeover_image_url: takeoverImageUrl.trim(),
       });
       setLogoSize(normalizedLogoSize);
       setLogoFit(normalizedLogoFit);
@@ -2825,9 +2905,13 @@ export default function AdminPanel() {
         : "Disabling daily popular category...",
     });
     try {
-      await jsonRequest(`/api/restaurant/${restaurant.id}/popular-badges`, "PUT", {
-        enabled,
-      });
+      await jsonRequest(
+        `/api/restaurant/${restaurant.id}/popular-badges`,
+        "PUT",
+        {
+          enabled,
+        },
+      );
       const popularity = await apiRequest<PopularCategoryStats>(
         `/api/popularity/category/${restaurant.id}`,
       );
@@ -2861,14 +2945,16 @@ export default function AdminPanel() {
     setSavingAction("reviews-enabled");
     setAdminNotice({
       type: "info",
-      message: enabled
-        ? "Enabling reviews..."
-        : "Disabling reviews...",
+      message: enabled ? "Enabling reviews..." : "Disabling reviews...",
     });
     try {
-      await jsonRequest(`/api/restaurant/${restaurant.id}/reviews-enabled`, "PUT", {
-        enabled,
-      });
+      await jsonRequest(
+        `/api/restaurant/${restaurant.id}/reviews-enabled`,
+        "PUT",
+        {
+          enabled,
+        },
+      );
       setRestaurant({
         ...restaurant,
         reviews_enabled: enabled ? 1 : 0,
@@ -2892,7 +2978,9 @@ export default function AdminPanel() {
   };
 
   const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
-  const [cropTarget, setCropTarget] = useState<"logo" | "background" | null>(null);
+  const [cropTarget, setCropTarget] = useState<"logo" | "background" | null>(
+    null,
+  );
   const cropObjectUrlRef = useRef<string | null>(null);
 
   const closeCropper = () => {
@@ -2998,7 +3086,9 @@ export default function AdminPanel() {
     objectPosition: logoObjectPosition,
   };
   const logoInputValue = isDataImageUrl(logoUrl) ? "" : logoUrl;
-  const backgroundInputValue = isDataImageUrl(backgroundUrl) ? "" : backgroundUrl;
+  const backgroundInputValue = isDataImageUrl(backgroundUrl)
+    ? ""
+    : backgroundUrl;
   const activePopularCategoryName =
     popularCategoryStats?.active_category?.name || "No winner yet";
   const currentLeaderName =
@@ -3149,6 +3239,136 @@ export default function AdminPanel() {
                     />
                   </div>
                 </div>
+
+                {/* Takeover Promo Settings */}
+                <div className="pt-4 border-t border-stone-100">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-bold text-stone-700">
+                      Special Promo Popup
+                    </h3>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="sr-only peer"
+                        checked={takeoverEnabled}
+                        onChange={(e) => setTakeoverEnabled(e.target.checked)}
+                      />
+                      <div className="w-9 h-5 bg-stone-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
+                    </label>
+                  </div>
+
+                  {takeoverEnabled && (
+                    <div className="space-y-4 bg-stone-50 p-4 rounded-xl border border-stone-200">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-stone-400 font-bold ml-1 uppercase">
+                            Promo Title (Headline)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Special of the day!"
+                            className="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-stone-400"
+                            value={takeoverTitle}
+                            onChange={(e) => setTakeoverTitle(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-stone-400 font-bold ml-1 uppercase">
+                            Price
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. 500 MKD"
+                            className="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-stone-400"
+                            value={takeoverPrice}
+                            onChange={(e) => setTakeoverPrice(e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-stone-400 font-bold ml-1 uppercase">
+                          Description
+                        </label>
+                        <textarea
+                          placeholder="Describe the promo..."
+                          className="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-stone-400 min-h-[80px]"
+                          value={takeoverMessage}
+                          onChange={(e) => setTakeoverMessage(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[10px] uppercase tracking-widest text-stone-400 font-bold block mb-1">
+                          Allergens
+                        </label>
+                        <AllergenPicker
+                          selected={
+                            takeoverAllergens
+                              ? takeoverAllergens.split(",")
+                              : []
+                          }
+                          onChange={(allergens) =>
+                            setTakeoverAllergens(allergens.join(","))
+                          }
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <label className="text-[10px] font-bold text-stone-400 uppercase">
+                          Promo Image
+                        </label>
+                        <div className="flex items-center gap-4">
+                          <div className="relative group bg-white rounded-xl border-2 border-dashed border-stone-200 w-32 h-20 flex items-center justify-center overflow-hidden">
+                            {takeoverImageUrl ? (
+                              <>
+                                <img
+                                  src={takeoverImageUrl}
+                                  alt="Promo"
+                                  className="w-full h-full object-cover"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setTakeoverImageUrl("");
+                                  }}
+                                  className="absolute top-1 right-1 bg-white/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                                  title="Remove image"
+                                >
+                                  <X size={14} />
+                                </button>
+                              </>
+                            ) : (
+                              <ImageIcon className="text-stone-300" size={24} />
+                            )}
+                            {!takeoverImageUrl && (
+                              <input
+                                type="file"
+                                accept={ACCEPTED_IMAGE_FORMATS}
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  const reader = new FileReader();
+                                  reader.onload = (event) => {
+                                    setTakeoverImageUrl(
+                                      event.target?.result as string,
+                                    );
+                                  };
+                                  reader.readAsDataURL(file);
+                                }}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                              />
+                            )}
+                          </div>
+                          <div className="text-xs text-stone-500">
+                            Upload an image to show full screen.
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="flex flex-col gap-2">
                     <label className="text-[10px] font-bold text-stone-400 uppercase">
@@ -3167,7 +3387,10 @@ export default function AdminPanel() {
                             {/* Delete button — no file input behind it */}
                             <button
                               type="button"
-                              onClick={(e) => { e.stopPropagation(); clearLogo(); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                clearLogo();
+                              }}
                               className="absolute top-1 right-1 bg-white/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10"
                               title="Remove logo"
                             >
@@ -3342,7 +3565,10 @@ export default function AdminPanel() {
                             {/* Delete button — no file input behind it */}
                             <button
                               type="button"
-                              onClick={(e) => { e.stopPropagation(); setBackgroundUrl(""); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setBackgroundUrl("");
+                              }}
                               className="absolute top-1 right-1 bg-white/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10"
                               title="Remove background"
                             >
@@ -3477,19 +3703,25 @@ export default function AdminPanel() {
             <p className="text-[10px] uppercase tracking-widest text-stone-400 font-bold">
               Available
             </p>
-            <p className="text-2xl font-serif mt-1">{adminStats.availableProducts}</p>
+            <p className="text-2xl font-serif mt-1">
+              {adminStats.availableProducts}
+            </p>
           </div>
           <div className="bg-white border border-stone-200 rounded-xl px-4 py-3">
             <p className="text-[10px] uppercase tracking-widest text-stone-400 font-bold">
               Sold out
             </p>
-            <p className="text-2xl font-serif mt-1">{adminStats.soldOutProducts}</p>
+            <p className="text-2xl font-serif mt-1">
+              {adminStats.soldOutProducts}
+            </p>
           </div>
           <div className="bg-white border border-stone-200 rounded-xl px-4 py-3 col-span-2 md:col-span-1">
             <p className="text-[10px] uppercase tracking-widest text-stone-400 font-bold">
               No photo
             </p>
-            <p className="text-2xl font-serif mt-1">{adminStats.productsWithoutImages}</p>
+            <p className="text-2xl font-serif mt-1">
+              {adminStats.productsWithoutImages}
+            </p>
           </div>
         </section>
 
@@ -3569,7 +3801,9 @@ export default function AdminPanel() {
                   Customer Reviews
                 </p>
                 <p className="mt-1 max-w-xl text-xs leading-relaxed text-stone-500">
-                  Enable or disable customer reviews and ratings on your public menu. If enabled, a reviews icon will be shown on the menu, and users can submit star ratings and comments.
+                  Enable or disable customer reviews and ratings on your public
+                  menu. If enabled, a reviews icon will be shown on the menu,
+                  and users can submit star ratings and comments.
                 </p>
               </div>
             </div>
@@ -3681,11 +3915,15 @@ export default function AdminPanel() {
       {cropImageSrc && cropTarget && (
         <ImageCropper
           imageSrc={cropImageSrc}
-          title={cropTarget === "background" ? "Crop Hero Background" : "Crop Logo"}
+          title={
+            cropTarget === "background" ? "Crop Hero Background" : "Crop Logo"
+          }
           aspect={cropTarget === "background" ? 16 / 9 : undefined}
           maxOutputWidth={cropTarget === "background" ? 1920 : 1200}
           maxOutputHeight={cropTarget === "background" ? 1080 : 1200}
-          outputMimeType={cropTarget === "background" ? "image/jpeg" : "image/png"}
+          outputMimeType={
+            cropTarget === "background" ? "image/jpeg" : "image/png"
+          }
           outputQuality={0.88}
           onCropComplete={(croppedDataUrl) => {
             if (cropTarget === "logo") {

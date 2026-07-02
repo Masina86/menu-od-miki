@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -30,6 +36,7 @@ import {
   Clock,
   Send,
   MessageSquarePlus,
+  X,
 } from "lucide-react";
 
 const DEFAULT_LOGO_SIZE = 100;
@@ -86,7 +93,11 @@ const TRANSLATIONS: Record<string, Record<Language, string>> = {
   calories_unit: { MK: "kcal", BG: "kcal", EN: "kcal" },
   all_categories: { MK: "Сите", BG: "Всички", EN: "All" },
   reviews: { MK: "Рецензии", BG: "Отзиви", EN: "Reviews" },
-  write_review: { MK: "Напишете рецензија", BG: "Напишете отзив", EN: "Write a Review" },
+  write_review: {
+    MK: "Напишете рецензија",
+    BG: "Напишете отзив",
+    EN: "Write a Review",
+  },
 };
 
 const t = (key: string, lang: Language): string =>
@@ -125,13 +136,18 @@ const getLangValue = (obj: any, field: string, lang: Language): string => {
 const isMissingTranslation = (obj: any, field: string, lang: Language) => {
   if (lang === "MK") return false;
   const translated =
-    lang === "EN" ? obj[`${field}_en`] : lang === "BG" ? obj[`${field}_bg`] : "";
+    lang === "EN"
+      ? obj[`${field}_en`]
+      : lang === "BG"
+        ? obj[`${field}_bg`]
+        : "";
   const translatedOk = translated && String(translated).trim() !== "";
   const baseOk = obj[field] && String(obj[field]).trim() !== "";
   return baseOk && !translatedOk;
 };
 
-const hasText = (value?: string | null) => !!value && String(value).trim() !== "";
+const hasText = (value?: string | null) =>
+  !!value && String(value).trim() !== "";
 
 const hasMenuContentForLanguage = (
   categories: Category[],
@@ -157,7 +173,9 @@ const hasMenuContentForLanguage = (
       );
     });
 
-    return productHasText || (category.subcategories || []).some(categoryHasText);
+    return (
+      productHasText || (category.subcategories || []).some(categoryHasText)
+    );
   };
 
   return categories.some(categoryHasText);
@@ -187,7 +205,9 @@ const productMatchesSearch = (
   language: Language,
 ) =>
   getLangValue(product, "name", language).toLowerCase().includes(query) ||
-  getLangValue(product, "description", language).toLowerCase().includes(query) ||
+  getLangValue(product, "description", language)
+    .toLowerCase()
+    .includes(query) ||
   getTagList(product.tags).some((tag) => tag.toLowerCase().includes(query));
 
 const categoryMatchesSearch = (
@@ -658,11 +678,11 @@ const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
           <span
             className={`transition-colors ${darkMode ? "text-stone-500 group-hover:text-stone-200" : "text-stone-300 group-hover:text-stone-900"}`}
           >
-          {isExpanded ? (
-            <ChevronDown size={isSubcategory ? 16 : 22} />
-          ) : (
-            <ChevronRight size={isSubcategory ? 16 : 22} />
-          )}
+            {isExpanded ? (
+              <ChevronDown size={isSubcategory ? 16 : 22} />
+            ) : (
+              <ChevronRight size={isSubcategory ? 16 : 22} />
+            )}
           </span>
         </div>
       </button>
@@ -822,18 +842,26 @@ const heroContainerVariants = {
     transition: {
       staggerChildren: 0.15,
       delayChildren: 0.1,
-    }
-  }
+    },
+  },
 };
 
 const heroItemVariants = {
   hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { type: "spring", stiffness: 300, damping: 24 },
+  },
 };
 
 const heroLogoVariants = {
   hidden: { opacity: 0, scale: 0.85 },
-  show: { opacity: 1, scale: 1, transition: { type: "spring", stiffness: 300, damping: 20 } }
+  show: {
+    opacity: 1,
+    scale: 1,
+    transition: { type: "spring", stiffness: 300, damping: 20 },
+  },
 };
 
 export default function MenuView() {
@@ -856,7 +884,17 @@ export default function MenuView() {
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [isAtTop, setIsAtTop] = useState(true);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [showTakeover, setShowTakeover] = useState(false);
 
+  useEffect(() => {
+    if (restaurant && restaurant.takeover_enabled) {
+      const shownKey = `takeover_${restaurant.id}`;
+      if (!sessionStorage.getItem(shownKey)) {
+        setShowTakeover(true);
+        sessionStorage.setItem(shownKey, "1");
+      }
+    }
+  }, [restaurant]);
   // Persist dark mode
   useEffect(() => {
     if (localStorage.getItem("menuDarkMode") === null) {
@@ -949,8 +987,7 @@ export default function MenuView() {
   }, []);
 
   // ── Loading state
-  if (loading)
-    return <MenuSkeleton darkMode={darkMode} />;
+  if (loading) return <MenuSkeleton darkMode={darkMode} />;
 
   if (loadError)
     return (
@@ -1016,14 +1053,20 @@ export default function MenuView() {
     "--hero-logo-desktop-height": `clamp(${Math.round(
       120 * logoScale,
     )}px, ${(14 * logoScale).toFixed(1)}vh, ${Math.round(200 * logoScale)}px)`,
-    width: logoFit === "cover" ? `min(${Math.round(360 * logoScale)}px, 82vw)` : "auto",
+    width:
+      logoFit === "cover"
+        ? `min(${Math.round(360 * logoScale)}px, 82vw)`
+        : "auto",
     maxWidth: "82vw",
     objectFit: logoFit,
     objectPosition: logoObjectPosition,
   } as React.CSSProperties;
   const footerLogoStyle: React.CSSProperties = {
     height: `${Math.round(112 * logoScale)}px`,
-    width: logoFit === "cover" ? `min(${Math.round(260 * logoScale)}px, 70vw)` : "auto",
+    width:
+      logoFit === "cover"
+        ? `min(${Math.round(260 * logoScale)}px, 70vw)`
+        : "auto",
     maxWidth: "70vw",
     objectFit: logoFit,
     objectPosition: logoObjectPosition,
@@ -1068,12 +1111,12 @@ export default function MenuView() {
           {isAdminAuthenticated && (
             <Link
               to={`/${slug}/admin`}
-                className={`min-h-11 min-w-11 inline-flex items-center justify-center rounded-full shadow-sm border backdrop-blur-md transition-all hover:scale-105
+              className={`min-h-11 min-w-11 inline-flex items-center justify-center rounded-full shadow-sm border backdrop-blur-md transition-all hover:scale-105
                 ${
                   darkMode
                     ? "bg-stone-800/90 border-stone-700 text-stone-400 hover:text-stone-100"
                     : "bg-white/80 border-stone-200 text-stone-400 hover:text-stone-900"
-              }`}
+                }`}
               title={t("back_to_admin", language)}
               aria-label={t("back_to_admin", language)}
             >
@@ -1103,7 +1146,7 @@ export default function MenuView() {
                   darkMode
                     ? "bg-stone-800/90 border-stone-700 text-stone-400 hover:text-stone-100"
                     : "bg-white/80 border-stone-200 text-stone-400 hover:text-stone-900"
-              }`}
+                }`}
               title="WiFi Password"
               aria-label="Show WiFi password"
             >
@@ -1138,17 +1181,16 @@ export default function MenuView() {
 
           {/* Language switcher */}
           {availableLanguages.length > 1 && (
-
-          <div
-            className={`rounded-full p-1 shadow-sm border backdrop-blur-md flex items-center gap-0.5
+            <div
+              className={`rounded-full p-1 shadow-sm border backdrop-blur-md flex items-center gap-0.5
             ${darkMode ? "bg-stone-800/90 border-stone-700" : "bg-white/80 border-stone-200"}`}
-          >
-            {availableLanguages.map((l) => (
-              <button
-                key={l}
-                onClick={() => setLanguage(l)}
-                aria-label={`Switch language to ${l}`}
-                className={`px-3 py-1.5 rounded-full text-[10px] font-bold tracking-wider transition-all
+            >
+              {availableLanguages.map((l) => (
+                <button
+                  key={l}
+                  onClick={() => setLanguage(l)}
+                  aria-label={`Switch language to ${l}`}
+                  className={`px-3 py-1.5 rounded-full text-[10px] font-bold tracking-wider transition-all
                   ${
                     language === l
                       ? darkMode
@@ -1158,11 +1200,11 @@ export default function MenuView() {
                         ? "text-stone-400 hover:text-stone-100"
                         : "text-stone-400 hover:text-stone-900"
                   }`}
-              >
-                {l}
-              </button>
-            ))}
-          </div>
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
           )}
         </div>
 
@@ -1224,7 +1266,13 @@ export default function MenuView() {
           {/* Full-bleed background layer */}
           <div
             className="absolute inset-0 z-0"
-            style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+            }}
           >
             {restaurant.background_url ? (
               <img
@@ -1337,7 +1385,10 @@ export default function MenuView() {
               </motion.div>
             )}
             {hasSocial && (
-              <motion.div variants={heroItemVariants} className="flex items-center justify-center gap-4 mt-3 md:mt-4">
+              <motion.div
+                variants={heroItemVariants}
+                className="flex items-center justify-center gap-4 mt-3 md:mt-4"
+              >
                 {restaurant.facebook_url && (
                   <a
                     href={restaurant.facebook_url}
@@ -1403,7 +1454,9 @@ export default function MenuView() {
               <p className={darkMode ? "text-stone-500" : "text-stone-400"}>
                 {t("updated", language)}
               </p>
-              <p className={`mt-2 text-sm ${darkMode ? "text-stone-600" : "text-stone-400"}`}>
+              <p
+                className={`mt-2 text-sm ${darkMode ? "text-stone-600" : "text-stone-400"}`}
+              >
                 Please check again soon.
               </p>
             </div>
@@ -1601,6 +1654,92 @@ export default function MenuView() {
           language={language}
           darkMode={darkMode}
         />
+
+        <AnimatePresence>
+          {showTakeover && restaurant && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+              onClick={() => setShowTakeover(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                className={`relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl shadow-2xl ${darkMode ? "bg-stone-900 text-stone-100" : "bg-white text-stone-900"}`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  className="absolute top-4 right-4 z-10 flex items-center justify-center w-10 h-10 rounded-full bg-black/50 text-white backdrop-blur-md hover:bg-black/70 transition-colors"
+                  onClick={() => setShowTakeover(false)}
+                >
+                  <X size={20} />
+                </button>
+
+                {restaurant.takeover_image_url && (
+                  <div className="w-full aspect-[4/3] sm:aspect-video relative overflow-hidden">
+                    <img
+                      src={restaurant.takeover_image_url}
+                      alt={restaurant.takeover_title || "Promo"}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+                  </div>
+                )}
+
+                <div
+                  className={`p-6 ${restaurant.takeover_image_url ? "-mt-8 relative z-10" : ""}`}
+                >
+                  <div className="flex flex-col items-center text-center gap-3">
+                    {restaurant.takeover_title && (
+                      <h2 className="text-2xl font-black uppercase tracking-wide">
+                        {restaurant.takeover_title}
+                      </h2>
+                    )}
+
+                    {restaurant.takeover_message && (
+                      <p
+                        className={`text-sm md:text-base ${darkMode ? "text-stone-300" : "text-stone-600"}`}
+                      >
+                        {restaurant.takeover_message}
+                      </p>
+                    )}
+
+                    {restaurant.takeover_price && (
+                      <div className="mt-2 inline-block px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full font-bold shadow-md">
+                        {restaurant.takeover_price}
+                      </div>
+                    )}
+
+                    {restaurant.takeover_allergens && (
+                      <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                        <span
+                          className={`text-[10px] font-bold uppercase tracking-widest ${darkMode ? "text-stone-500" : "text-stone-400"}`}
+                        >
+                          {t("allergens", language)}:
+                        </span>
+                        {getAllergenList(restaurant.takeover_allergens).map(
+                          (a) => (
+                            <AllergenBadge
+                              key={a}
+                              allergenKey={a}
+                              darkMode={darkMode}
+                              language={language}
+                            />
+                          ),
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

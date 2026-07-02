@@ -55,7 +55,9 @@ try {
     )
     .run();
   if (slugMigration.changes > 0) {
-    console.log(`[db] migrated slug to dismak-oil (${slugMigration.changes} row(s))`);
+    console.log(
+      `[db] migrated slug to dismak-oil (${slugMigration.changes} row(s))`,
+    );
   }
 } catch (e) {
   console.warn("[db] slug migration warning:", e);
@@ -111,19 +113,35 @@ tryAlter("ALTER TABLE restaurants ADD COLUMN background_url TEXT");
 tryAlter("ALTER TABLE restaurants ADD COLUMN logo_url TEXT");
 tryAlter("ALTER TABLE restaurants ADD COLUMN logo_size INTEGER DEFAULT 100");
 tryAlter("ALTER TABLE restaurants ADD COLUMN logo_fit TEXT DEFAULT 'contain'");
-tryAlter("ALTER TABLE restaurants ADD COLUMN logo_position_x INTEGER DEFAULT 50");
-tryAlter("ALTER TABLE restaurants ADD COLUMN logo_position_y INTEGER DEFAULT 50");
+tryAlter(
+  "ALTER TABLE restaurants ADD COLUMN logo_position_x INTEGER DEFAULT 50",
+);
+tryAlter(
+  "ALTER TABLE restaurants ADD COLUMN logo_position_y INTEGER DEFAULT 50",
+);
 tryAlter("ALTER TABLE restaurants ADD COLUMN phone TEXT");
 tryAlter("ALTER TABLE restaurants ADD COLUMN address TEXT");
 tryAlter("ALTER TABLE restaurants ADD COLUMN wifi_password TEXT");
 tryAlter("ALTER TABLE restaurants ADD COLUMN opening_hours TEXT");
 tryAlter("ALTER TABLE restaurants ADD COLUMN facebook_url TEXT");
 tryAlter("ALTER TABLE restaurants ADD COLUMN instagram_url TEXT");
-tryAlter("ALTER TABLE restaurants ADD COLUMN popular_badges_enabled INTEGER DEFAULT 1");
+tryAlter(
+  "ALTER TABLE restaurants ADD COLUMN popular_badges_enabled INTEGER DEFAULT 1",
+);
 tryAlter("ALTER TABLE restaurants ADD COLUMN popular_category_id INTEGER");
 tryAlter("ALTER TABLE restaurants ADD COLUMN popular_category_period_key TEXT");
 tryAlter("ALTER TABLE restaurants ADD COLUMN popular_category_updated_at TEXT");
-tryAlter("ALTER TABLE restaurants ADD COLUMN reviews_enabled INTEGER DEFAULT 1");
+tryAlter(
+  "ALTER TABLE restaurants ADD COLUMN reviews_enabled INTEGER DEFAULT 1",
+);
+tryAlter(
+  "ALTER TABLE restaurants ADD COLUMN takeover_enabled INTEGER DEFAULT 0",
+);
+tryAlter("ALTER TABLE restaurants ADD COLUMN takeover_title TEXT");
+tryAlter("ALTER TABLE restaurants ADD COLUMN takeover_message TEXT");
+tryAlter("ALTER TABLE restaurants ADD COLUMN takeover_price TEXT");
+tryAlter("ALTER TABLE restaurants ADD COLUMN takeover_allergens TEXT");
+tryAlter("ALTER TABLE restaurants ADD COLUMN takeover_image_url TEXT");
 
 tryAlter(
   "ALTER TABLE categories ADD COLUMN parent_id INTEGER REFERENCES categories(id) ON DELETE CASCADE",
@@ -187,7 +205,9 @@ async function startServer() {
   const PORT = Number(process.env.PORT || 3000);
 
   const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-  const ai = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
+  const ai = GEMINI_API_KEY
+    ? new GoogleGenAI({ apiKey: GEMINI_API_KEY })
+    : null;
   const translationCache = new Map<string, string>();
   const ADMIN_PASSWORD =
     process.env.ADMIN_PASSWORD ||
@@ -257,9 +277,7 @@ async function startServer() {
   const getCurrentPeriodKey = (date = new Date()) => {
     const local = localDateTimeParts(date);
     if (local.hour >= POPULARITY_CUTOFF_HOUR) return formatPeriodKey(date);
-    return formatPeriodKey(
-      new Date(date.getTime() - 24 * 60 * 60 * 1000),
-    );
+    return formatPeriodKey(new Date(date.getTime() - 24 * 60 * 60 * 1000));
   };
 
   const getPreviousPeriodKey = (periodKey: string) => {
@@ -294,14 +312,12 @@ async function startServer() {
     sourceText: string,
     current: { en?: string | null; bg?: string | null },
   ) => {
-    const en =
-      !isBlank(current.en)
-        ? String(current.en)
-        : await translateText(sourceText, "EN");
-    const bg =
-      !isBlank(current.bg)
-        ? String(current.bg)
-        : await translateText(sourceText, "BG");
+    const en = !isBlank(current.en)
+      ? String(current.en)
+      : await translateText(sourceText, "EN");
+    const bg = !isBlank(current.bg)
+      ? String(current.bg)
+      : await translateText(sourceText, "BG");
     return {
       en: en && en.trim() ? en : null,
       bg: bg && bg.trim() ? bg : null,
@@ -535,7 +551,11 @@ async function startServer() {
     const edgeSaturation =
       Math.max(edgeColor.r, edgeColor.g, edgeColor.b) -
       Math.min(edgeColor.r, edgeColor.g, edgeColor.b);
-    const distance = Math.hypot(r - edgeColor.r, g - edgeColor.g, b - edgeColor.b);
+    const distance = Math.hypot(
+      r - edgeColor.r,
+      g - edgeColor.g,
+      b - edgeColor.b,
+    );
     const channelDistance = Math.max(
       Math.abs(r - edgeColor.r),
       Math.abs(g - edgeColor.g),
@@ -560,7 +580,10 @@ async function startServer() {
     height: number,
     channels: number,
   ) => {
-    const buckets = new Map<string, { r: number; g: number; b: number; count: number }>();
+    const buckets = new Map<
+      string,
+      { r: number; g: number; b: number; count: number }
+    >();
     const addSample = (x: number, y: number) => {
       const offset = (y * width + x) * channels;
       const r = data[offset];
@@ -726,7 +749,10 @@ async function startServer() {
         }
       }
       if (neighboringBackground > 0) {
-        data[offset + 3] = Math.max(120, data[offset + 3] - neighboringBackground * 18);
+        data[offset + 3] = Math.max(
+          120,
+          data[offset + 3] - neighboringBackground * 18,
+        );
       }
     }
 
@@ -761,7 +787,8 @@ async function startServer() {
     field = "image",
   ) => {
     if (!imageUrl) return imageUrl;
-    if (!imageUrl.startsWith("data:") || imageUrl.length < 2048) return imageUrl;
+    if (!imageUrl.startsWith("data:") || imageUrl.length < 2048)
+      return imageUrl;
     if (type === "categories" && imageUrl.length > 500_000) return null;
     const version = imageVersion(imageUrl);
     return type === "restaurants"
@@ -872,15 +899,23 @@ async function startServer() {
 
   const getPopularCategoryStats = (restaurantId: number) => {
     const restaurant = refreshPopularCategory(
-      db.prepare("SELECT * FROM restaurants WHERE id = ?").get(restaurantId) as any,
+      db
+        .prepare("SELECT * FROM restaurants WHERE id = ?")
+        .get(restaurantId) as any,
     );
     const currentPeriodKey = getCurrentPeriodKey();
     const previousPeriodKey = getPreviousPeriodKey(currentPeriodKey);
     const activeCategory = restaurant.popular_category_id
       ? getCategoryById(Number(restaurant.popular_category_id), restaurantId)
       : null;
-    const currentLeader = getPopularCategoryWinner(restaurantId, currentPeriodKey);
-    const previousWinner = getPopularCategoryWinner(restaurantId, previousPeriodKey);
+    const currentLeader = getPopularCategoryWinner(
+      restaurantId,
+      currentPeriodKey,
+    );
+    const previousWinner = getPopularCategoryWinner(
+      restaurantId,
+      previousPeriodKey,
+    );
     const currentViews = db
       .prepare(
         `SELECT COUNT(*) AS views
@@ -1021,9 +1056,14 @@ async function startServer() {
       const { slug } = req.body;
       if (isNaN(id)) throw new Error("Invalid restaurant ID");
       if (!slug || typeof slug !== "string") throw new Error("Invalid slug");
-      const existing = db.prepare("SELECT id FROM restaurants WHERE slug = ? AND id != ?").get(slug, id);
-      if (existing) throw new Error("Slug already in use by another restaurant");
-      const result = db.prepare("UPDATE restaurants SET slug = ? WHERE id = ?").run(slug, id);
+      const existing = db
+        .prepare("SELECT id FROM restaurants WHERE slug = ? AND id != ?")
+        .get(slug, id);
+      if (existing)
+        throw new Error("Slug already in use by another restaurant");
+      const result = db
+        .prepare("UPDATE restaurants SET slug = ? WHERE id = ?")
+        .run(slug, id);
       res.json({ success: true, changes: result.changes, slug });
     } catch (error: any) {
       console.error("[api] Error updating restaurant slug:", error);
@@ -1048,6 +1088,12 @@ async function startServer() {
         opening_hours,
         facebook_url,
         instagram_url,
+        takeover_enabled,
+        takeover_title,
+        takeover_message,
+        takeover_price,
+        takeover_allergens,
+        takeover_image_url,
       } = req.body;
       const id = Number(req.params.id);
 
@@ -1055,7 +1101,7 @@ async function startServer() {
 
       const result = db
         .prepare(
-          "UPDATE restaurants SET name = ?, background_url = ?, logo_url = ?, logo_size = ?, logo_fit = ?, logo_position_x = ?, logo_position_y = ?, phone = ?, address = ?, wifi_password = ?, opening_hours = ?, facebook_url = ?, instagram_url = ? WHERE id = ?",
+          "UPDATE restaurants SET name = ?, background_url = ?, logo_url = ?, logo_size = ?, logo_fit = ?, logo_position_x = ?, logo_position_y = ?, phone = ?, address = ?, wifi_password = ?, opening_hours = ?, facebook_url = ?, instagram_url = ?, takeover_enabled = ?, takeover_title = ?, takeover_message = ?, takeover_price = ?, takeover_allergens = ?, takeover_image_url = ? WHERE id = ?",
         )
         .run(
           String(name ?? "").trim(),
@@ -1071,6 +1117,12 @@ async function startServer() {
           optionalText(opening_hours),
           optionalText(facebook_url),
           optionalText(instagram_url),
+          Number(takeover_enabled ?? 0),
+          optionalText(takeover_title),
+          optionalText(takeover_message),
+          optionalText(takeover_price),
+          optionalText(takeover_allergens),
+          optionalText(takeover_image_url),
           id,
         );
 
@@ -1102,7 +1154,10 @@ async function startServer() {
         "logo",
       ),
     };
-    const menu = applyPopularCategory(buildMenu(restaurant.id, true), restaurant);
+    const menu = applyPopularCategory(
+      buildMenu(restaurant.id, true),
+      restaurant,
+    );
     res.setHeader("Cache-Control", "no-store");
     res.json(toJSON({ restaurant: publicRestaurant, menu }));
   });
@@ -1115,7 +1170,8 @@ async function startServer() {
         return res.status(400).json({ error: "Invalid category view." });
       }
       const category = getCategoryById(categoryId, restaurantId);
-      if (!category) return res.status(404).json({ error: "Category not found." });
+      if (!category)
+        return res.status(404).json({ error: "Category not found." });
 
       db.prepare(
         `INSERT INTO category_view_events
@@ -1144,11 +1200,14 @@ async function startServer() {
       const restaurant = db
         .prepare("SELECT id FROM restaurants WHERE id = ?")
         .get(restaurantId);
-      if (!restaurant) return res.status(404).json({ error: "Restaurant not found." });
+      if (!restaurant)
+        return res.status(404).json({ error: "Restaurant not found." });
       res.json(toJSON(getPopularCategoryStats(restaurantId)));
     } catch (error: any) {
       console.error("[api] Error loading category popularity:", error);
-      res.status(500).json({ error: error.message || "Could not load popularity." });
+      res
+        .status(500)
+        .json({ error: error.message || "Could not load popularity." });
     }
   });
 
@@ -1158,7 +1217,9 @@ async function startServer() {
       if (isNaN(id)) throw new Error("Invalid restaurant ID");
       const enabled = req.body?.enabled ? 1 : 0;
       const result = db
-        .prepare("UPDATE restaurants SET popular_badges_enabled = ? WHERE id = ?")
+        .prepare(
+          "UPDATE restaurants SET popular_badges_enabled = ? WHERE id = ?",
+        )
         .run(enabled, id);
       if (result.changes === 0) {
         return res.status(404).json({ error: "Restaurant not found." });
@@ -1185,7 +1246,8 @@ async function startServer() {
       const restaurant = db
         .prepare("SELECT id, reviews_enabled FROM restaurants WHERE id = ?")
         .get(restaurantId) as any;
-      if (!restaurant) return res.status(404).json({ error: "Restaurant not found." });
+      if (!restaurant)
+        return res.status(404).json({ error: "Restaurant not found." });
       if (restaurant.reviews_enabled === 0) {
         return res.json({ reviews: [], reviews_enabled: false });
       }
@@ -1201,7 +1263,9 @@ async function startServer() {
       res.json({ reviews: toJSON(reviews), reviews_enabled: true });
     } catch (error: any) {
       console.error("[api] Error fetching reviews:", error);
-      res.status(500).json({ error: error.message || "Could not load reviews." });
+      res
+        .status(500)
+        .json({ error: error.message || "Could not load reviews." });
     }
   });
 
@@ -1215,46 +1279,76 @@ async function startServer() {
       const restaurant = db
         .prepare("SELECT id, reviews_enabled FROM restaurants WHERE id = ?")
         .get(restaurantId) as any;
-      if (!restaurant) return res.status(404).json({ error: "Restaurant not found." });
+      if (!restaurant)
+        return res.status(404).json({ error: "Restaurant not found." });
       if (restaurant.reviews_enabled === 0) {
-        return res.status(403).json({ error: "Reviews are disabled for this restaurant." });
+        return res
+          .status(403)
+          .json({ error: "Reviews are disabled for this restaurant." });
       }
 
       // Rate limiting
-      const ip = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown");
+      const ip = String(
+        req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown",
+      );
       const now = Date.now();
       const lastReview = reviewRateLimit.get(ip);
       if (lastReview && now - lastReview < 60_000) {
-        return res.status(429).json({ error: "Please wait a moment before submitting another review." });
+        return res
+          .status(429)
+          .json({
+            error: "Please wait a moment before submitting another review.",
+          });
       }
       reviewRateLimit.set(ip, now);
       if (reviewRateLimit.size > 5000) {
-        reviewRateLimit.forEach((ts, key) => { if (now - ts > 60_000) reviewRateLimit.delete(key); });
+        reviewRateLimit.forEach((ts, key) => {
+          if (now - ts > 60_000) reviewRateLimit.delete(key);
+        });
       }
 
       const { author_name, rating, comment } = req.body;
       const ratingNum = Number(rating);
       if (!Number.isFinite(ratingNum) || ratingNum < 1 || ratingNum > 5) {
-        return res.status(400).json({ error: "Rating must be between 1 and 5." });
+        return res
+          .status(400)
+          .json({ error: "Rating must be between 1 and 5." });
       }
-      const trimmedAuthor = String(author_name || "").trim().slice(0, 100);
-      const trimmedComment = String(comment || "").trim().slice(0, 1000);
+      const trimmedAuthor = String(author_name || "")
+        .trim()
+        .slice(0, 100);
+      const trimmedComment = String(comment || "")
+        .trim()
+        .slice(0, 1000);
 
       const result = db
         .prepare(
           `INSERT INTO reviews (restaurant_id, author_name, rating, comment)
            VALUES (?, ?, ?, ?)`,
         )
-        .run(restaurantId, trimmedAuthor || "Anonymous", ratingNum, trimmedComment || null);
+        .run(
+          restaurantId,
+          trimmedAuthor || "Anonymous",
+          ratingNum,
+          trimmedComment || null,
+        );
 
       const newReview = db
-        .prepare("SELECT id, author_name, rating, comment, created_at FROM reviews WHERE id = ?")
-        .get(typeof result.lastInsertRowid === "bigint" ? Number(result.lastInsertRowid) : result.lastInsertRowid);
+        .prepare(
+          "SELECT id, author_name, rating, comment, created_at FROM reviews WHERE id = ?",
+        )
+        .get(
+          typeof result.lastInsertRowid === "bigint"
+            ? Number(result.lastInsertRowid)
+            : result.lastInsertRowid,
+        );
 
       res.status(201).json({ review: toJSON(newReview) });
     } catch (error: any) {
       console.error("[api] Error submitting review:", error);
-      res.status(500).json({ error: error.message || "Could not submit review." });
+      res
+        .status(500)
+        .json({ error: error.message || "Could not submit review." });
     }
   });
 
@@ -1275,7 +1369,9 @@ async function startServer() {
       res.json({ success: true });
     } catch (error: any) {
       console.error("[api] Error deleting review:", error);
-      res.status(500).json({ error: error.message || "Could not delete review." });
+      res
+        .status(500)
+        .json({ error: error.message || "Could not delete review." });
     }
   });
 
@@ -1324,7 +1420,8 @@ async function startServer() {
   app.post("/api/images/transparent-preview", async (req, res) => {
     try {
       const { image_url, type, id } = req.body || {};
-      const source = image_url || (type && id ? getStoredImage(type, id) : null);
+      const source =
+        image_url || (type && id ? getStoredImage(type, id) : null);
       const input = await resolveImageBuffer(source);
       const output = await makeBackgroundTransparent(input);
       res.json({
@@ -1527,17 +1624,29 @@ async function startServer() {
     const existing = db
       .prepare("SELECT * FROM categories WHERE id = ?")
       .get(id) as any;
-    const baseName = !isBlank(name) ? String(name) : String(existing?.name ?? "");
+    const baseName = !isBlank(name)
+      ? String(name)
+      : String(existing?.name ?? "");
     const nameTr = await ensureTranslations(baseName, {
       en: name_en ?? existing?.name_en,
       bg: name_bg ?? existing?.name_bg,
     });
-    const finalImage = !isBlank(image_url) ? image_url : existing?.image_url || null;
+    const finalImage = !isBlank(image_url)
+      ? image_url
+      : existing?.image_url || null;
 
     db.prepare(
       "UPDATE categories SET name = ?, name_en = ?, name_bg = ?, image_url = ? WHERE id = ?",
     ).run(baseName, nameTr.en, nameTr.bg, finalImage, id);
-    res.json(toJSON({ id, name: baseName, name_en: nameTr.en, name_bg: nameTr.bg, image_url: finalImage }));
+    res.json(
+      toJSON({
+        id,
+        name: baseName,
+        name_en: nameTr.en,
+        name_bg: nameTr.bg,
+        image_url: finalImage,
+      }),
+    );
   });
 
   app.delete("/api/categories/:id(\\d+)", (req, res) => {
@@ -1629,13 +1738,7 @@ async function startServer() {
             en: add?.name_en,
             bg: add?.name_bg,
           });
-          insertAddition.run(
-            productId,
-            addName,
-            addTr.en,
-            addTr.bg,
-            add.price,
-          );
+          insertAddition.run(productId, addName, addTr.en, addTr.bg, add.price);
         }
       }
 
@@ -1694,10 +1797,12 @@ async function startServer() {
         .prepare("SELECT * FROM products WHERE id = ?")
         .get(productId) as any;
 
-      const baseName = name !== undefined ? String(name) : String(existing?.name ?? "");
-      const baseDesc = description !== undefined
-        ? String(description)
-        : String(existing?.description ?? "");
+      const baseName =
+        name !== undefined ? String(name) : String(existing?.name ?? "");
+      const baseDesc =
+        description !== undefined
+          ? String(description)
+          : String(existing?.description ?? "");
 
       const nameTr = await ensureTranslations(baseName, {
         en: name_en ?? existing?.name_en,
@@ -1749,13 +1854,7 @@ async function startServer() {
             en: add?.name_en,
             bg: add?.name_bg,
           });
-          insertAddition.run(
-            productId,
-            addName,
-            addTr.en,
-            addTr.bg,
-            add.price,
-          );
+          insertAddition.run(productId, addName, addTr.en, addTr.bg, add.price);
         }
       }
 
@@ -1967,7 +2066,8 @@ async function startServer() {
           .trim();
 
       const exportImageValue = (value: any) => {
-        const image = value === null || value === undefined ? "" : String(value).trim();
+        const image =
+          value === null || value === undefined ? "" : String(value).trim();
         return image.startsWith("data:image/") ? "" : image;
       };
 
@@ -1982,8 +2082,9 @@ async function startServer() {
 
       const encodeHeaderFilename = (filename: string) =>
         encodeURIComponent(filename)
-          .replace(/['()]/g, (char) =>
-            `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
+          .replace(
+            /['()]/g,
+            (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
           )
           .replace(/\*/g, "%2A");
 
@@ -2052,12 +2153,17 @@ async function startServer() {
 
       const tsv = lines.join("\r\n");
 
-      res.setHeader("Content-Type", "text/tab-separated-values; charset=utf-16le");
+      res.setHeader(
+        "Content-Type",
+        "text/tab-separated-values; charset=utf-16le",
+      );
       res.setHeader(
         "Content-Disposition",
         `attachment; filename="${asciiFilename}"; filename*=UTF-8''${encodeHeaderFilename(filename)}`,
       );
-      res.send(Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(tsv, "utf16le")]));
+      res.send(
+        Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(tsv, "utf16le")]),
+      );
     } catch (error: any) {
       console.error("CSV export error:", error);
       if (!res.headersSent) {

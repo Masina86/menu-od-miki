@@ -62,6 +62,12 @@ export interface Restaurant {
   instagram_url?: string;
   popular_badges_enabled?: number;
   reviews_enabled?: number;
+  takeover_enabled?: number;
+  takeover_title?: string;
+  takeover_message?: string;
+  takeover_price?: string;
+  takeover_allergens?: string; // comma-separated: "gluten,dairy"
+  takeover_image_url?: string;
 }
 
 export type Language = "MK" | "BG" | "EN";
