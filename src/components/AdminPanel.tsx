@@ -23,6 +23,7 @@ import {
   Eye,
   EyeOff,
   Star,
+  Wand2,
 } from "lucide-react";
 import { motion, AnimatePresence, Reorder } from "motion/react";
 import { Restaurant, Category, Product, LogoFit } from "../types";
@@ -59,6 +60,18 @@ interface PopularCategoryStats {
 }
 
 type ProductFormData = Omit<Product, "id" | "category_id" | "sort_order">;
+
+interface TransparentPreviewResponse {
+  image_url: string;
+}
+
+interface TransparentDialogState {
+  title: string;
+  originalUrl: string;
+  resultUrl: string;
+  applyLabel: string;
+  onApply: (imageUrl: string) => Promise<void> | void;
+}
 
 const ACCEPTED_IMAGE_FORMATS = [
   ".jpg",
@@ -210,6 +223,104 @@ const AdminLoginView: React.FC<AdminLoginViewProps> = ({
   </div>
 );
 
+const checkerboardStyle: React.CSSProperties = {
+  backgroundColor: "#f8fafc",
+  backgroundImage:
+    "linear-gradient(45deg, #d6d3d1 25%, transparent 25%), linear-gradient(-45deg, #d6d3d1 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #d6d3d1 75%), linear-gradient(-45deg, transparent 75%, #d6d3d1 75%)",
+  backgroundPosition: "0 0, 0 8px, 8px -8px, -8px 0",
+  backgroundSize: "16px 16px",
+};
+
+const TransparentImageButton: React.FC<{
+  onClick: (e: React.MouseEvent) => void;
+  disabled?: boolean;
+  className?: string;
+}> = ({ onClick, disabled, className = "" }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    disabled={disabled}
+    title="Make image transparent"
+    className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border border-stone-200 bg-white/90 text-stone-500 shadow-sm transition-colors hover:bg-white hover:text-stone-900 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+  >
+    {disabled ? <Loader2 size={15} className="animate-spin" /> : <Wand2 size={15} />}
+  </button>
+);
+
+const TransparentPreviewDialog: React.FC<{
+  dialog: TransparentDialogState;
+  isApplying: boolean;
+  onApply: () => void;
+  onCancel: () => void;
+}> = ({ dialog, isApplying, onApply, onCancel }) => (
+  <div
+    className="fixed inset-0 z-[210] flex items-center justify-center bg-black/60 p-4"
+    onClick={(e) => e.target === e.currentTarget && !isApplying && onCancel()}
+  >
+    <div className="flex max-h-[94dvh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
+      <div className="flex items-center justify-between border-b border-stone-100 px-5 py-4">
+        <h3 className="text-base font-bold text-stone-800">{dialog.title}</h3>
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={isApplying}
+          className="rounded-lg p-2 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-800 disabled:opacity-50"
+          title="Close"
+        >
+          <X size={18} />
+        </button>
+      </div>
+      <div className="grid gap-4 overflow-auto p-5 md:grid-cols-2">
+        <div className="space-y-2">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-stone-400">
+            Original
+          </p>
+          <div className="flex aspect-square items-center justify-center overflow-hidden rounded-lg border border-stone-200 bg-stone-50">
+            <img
+              src={dialog.originalUrl}
+              alt="Original"
+              className="max-h-full max-w-full object-contain"
+            />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-stone-400">
+            Transparent
+          </p>
+          <div
+            className="flex aspect-square items-center justify-center overflow-hidden rounded-lg border border-stone-200"
+            style={checkerboardStyle}
+          >
+            <img
+              src={dialog.resultUrl}
+              alt="Transparent preview"
+              className="max-h-full max-w-full object-contain"
+            />
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center justify-end gap-3 border-t border-stone-100 px-5 py-4">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={isApplying}
+          className="rounded-lg bg-stone-100 px-4 py-2 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-200 disabled:opacity-50"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={onApply}
+          disabled={isApplying}
+          className="min-w-28 rounded-lg bg-stone-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-stone-800 disabled:opacity-60"
+        >
+          {isApplying ? "Applying..." : dialog.applyLabel}
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
 interface CategorySectionProps {
   category: Category;
   parentId?: number | null;
@@ -218,6 +329,11 @@ interface CategorySectionProps {
   onUpdateCategory: (
     id: number,
     data: any,
+    parentId?: number | null,
+  ) => Promise<void>;
+  onUpdateCategoryImage: (
+    id: number,
+    imageUrl: string,
     parentId?: number | null,
   ) => Promise<void>;
   onAddProduct: (
@@ -229,6 +345,12 @@ interface CategorySectionProps {
     productId: number,
     categoryId: number,
     p: ProductFormData,
+    parentId?: number | null,
+  ) => Promise<void>;
+  onUpdateProductImage: (
+    productId: number,
+    categoryId: number,
+    imageUrl: string,
     parentId?: number | null,
   ) => Promise<void>;
   onDeleteProduct: (
@@ -261,8 +383,10 @@ const CategorySection: React.FC<CategorySectionProps> = ({
   index,
   onDelete,
   onUpdateCategory,
+  onUpdateCategoryImage,
   onAddProduct,
   onUpdateProduct,
+  onUpdateProductImage,
   onDeleteProduct,
   onMoveProduct,
   onMoveCategory,
@@ -314,6 +438,64 @@ const CategorySection: React.FC<CategorySectionProps> = ({
   });
   const [selectedProductForModal, setSelectedProductForModal] =
     useState<Product | null>(null);
+  const [transparentDialog, setTransparentDialog] =
+    useState<TransparentDialogState | null>(null);
+  const [transparentAction, setTransparentAction] = useState<string | null>(null);
+  const [isApplyingTransparent, setIsApplyingTransparent] = useState(false);
+
+  const openTransparentPreview = async (
+    actionKey: string,
+    options: {
+      title: string;
+      originalUrl: string;
+      payload: Record<string, unknown>;
+      applyLabel: string;
+      onApply: (imageUrl: string) => Promise<void> | void;
+    },
+  ) => {
+    if (!options.originalUrl) return;
+    setTransparentAction(actionKey);
+    setFormNotice({ type: "info", message: "Preparing transparent preview..." });
+    try {
+      const preview = await jsonRequest<TransparentPreviewResponse>(
+        "/api/images/transparent-preview",
+        "POST",
+        options.payload,
+      );
+      setTransparentDialog({
+        title: options.title,
+        originalUrl: options.originalUrl,
+        resultUrl: preview.image_url,
+        applyLabel: options.applyLabel,
+        onApply: options.onApply,
+      });
+      setFormNotice(null);
+    } catch (error: any) {
+      setFormNotice({
+        type: "error",
+        message: error?.message || "Could not make this image transparent.",
+      });
+    } finally {
+      setTransparentAction(null);
+    }
+  };
+
+  const applyTransparentPreview = async () => {
+    if (!transparentDialog) return;
+    setIsApplyingTransparent(true);
+    try {
+      await transparentDialog.onApply(transparentDialog.resultUrl);
+      setTransparentDialog(null);
+      setFormNotice({ type: "success", message: "Transparent image applied." });
+    } catch (error: any) {
+      setFormNotice({
+        type: "error",
+        message: error?.message || "Could not apply transparent image.",
+      });
+    } finally {
+      setIsApplyingTransparent(false);
+    }
+  };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -843,11 +1025,28 @@ const CategorySection: React.FC<CategorySectionProps> = ({
               <ChevronRight size={18} className="text-stone-400" />
             )}
             {category.image_url && (
-              <img
-                src={category.image_url}
-                alt=""
-                className="w-8 h-8 rounded-full object-cover border border-stone-200"
-              />
+              <div className="relative">
+                <img
+                  src={category.image_url}
+                  alt=""
+                  className="h-8 w-8 rounded-full border border-stone-200 object-cover"
+                />
+                <TransparentImageButton
+                  disabled={transparentAction === `category-${category.id}`}
+                  className="absolute -right-3 -top-3 h-6 w-6 rounded-full"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void openTransparentPreview(`category-${category.id}`, {
+                      title: `Make ${category.name} transparent`,
+                      originalUrl: category.image_url || "",
+                      payload: { type: "category", id: category.id },
+                      applyLabel: "Apply",
+                      onApply: (imageUrl) =>
+                        onUpdateCategoryImage(category.id, imageUrl, parentId),
+                    });
+                  }}
+                />
+              </div>
             )}
             <h2 className="text-xl font-serif">{category.name}</h2>
           </div>
@@ -991,11 +1190,31 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                   className="text-xs text-stone-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-stone-100 file:text-stone-700 hover:file:bg-stone-200"
                 />
                 {categoryEditData.image_url && (
-                  <img
-                    src={categoryEditData.image_url}
-                    alt="Preview"
-                    className="w-10 h-10 object-cover rounded-full border border-stone-200"
-                  />
+                  <div className="relative">
+                    <img
+                      src={categoryEditData.image_url}
+                      alt="Preview"
+                      className="h-10 w-10 rounded-full border border-stone-200 object-cover"
+                    />
+                    <TransparentImageButton
+                      disabled={transparentAction === `category-form-${category.id}`}
+                      className="absolute -right-3 -top-3 h-6 w-6 rounded-full"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void openTransparentPreview(`category-form-${category.id}`, {
+                          title: "Make category image transparent",
+                          originalUrl: categoryEditData.image_url,
+                          payload: { image_url: categoryEditData.image_url },
+                          applyLabel: "Use preview",
+                          onApply: (imageUrl) =>
+                            setCategoryEditData({
+                              ...categoryEditData,
+                              image_url: imageUrl,
+                            }),
+                        });
+                      }}
+                    />
+                  </div>
                 )}
               </div>
             </div>
@@ -1147,8 +1366,10 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                             isSubcategory={true}
                             onDelete={onDelete}
                             onUpdateCategory={onUpdateCategory}
+                            onUpdateCategoryImage={onUpdateCategoryImage}
                             onAddProduct={onAddProduct}
                             onUpdateProduct={onUpdateProduct}
+                            onUpdateProductImage={onUpdateProductImage}
                             onDeleteProduct={onDeleteProduct}
                             onMoveProduct={onMoveProduct}
                             onMoveCategory={onMoveCategory}
@@ -1526,11 +1747,28 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                         className="text-xs text-stone-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-stone-100 file:text-stone-700 hover:file:bg-stone-200"
                       />
                       {newProd.image_url && (
-                        <img
-                          src={newProd.image_url}
-                          alt="Preview"
-                          className="w-12 h-12 object-cover rounded-lg border border-stone-200"
-                        />
+                        <div className="relative">
+                          <img
+                            src={newProd.image_url}
+                            alt="Preview"
+                            className="h-12 w-12 rounded-lg border border-stone-200 object-cover"
+                          />
+                          <TransparentImageButton
+                            disabled={transparentAction === "product-form"}
+                            className="absolute -right-3 -top-3 h-6 w-6 rounded-full"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void openTransparentPreview("product-form", {
+                                title: "Make product image transparent",
+                                originalUrl: newProd.image_url,
+                                payload: { image_url: newProd.image_url },
+                                applyLabel: "Use preview",
+                                onApply: (imageUrl) =>
+                                  setNewProd({ ...newProd, image_url: imageUrl }),
+                              });
+                            }}
+                          />
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1584,6 +1822,26 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                         <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/img:opacity-100 transition-opacity rounded-xl flex items-center justify-center">
                           <Maximize2 size={16} className="text-white" />
                         </div>
+                        <TransparentImageButton
+                          disabled={transparentAction === `product-${product.id}`}
+                          className="absolute -right-2 -top-2 h-7 w-7 rounded-full opacity-0 group-hover/img:opacity-100"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void openTransparentPreview(`product-${product.id}`, {
+                              title: `Make ${product.name} transparent`,
+                              originalUrl: product.image_url || "",
+                              payload: { type: "product", id: product.id },
+                              applyLabel: "Apply",
+                              onApply: (imageUrl) =>
+                                onUpdateProductImage(
+                                  product.id,
+                                  category.id,
+                                  imageUrl,
+                                  parentId,
+                                ),
+                            });
+                          }}
+                        />
                       </div>
                     )}
                     <div className="flex-1">
@@ -1723,6 +1981,16 @@ const CategorySection: React.FC<CategorySectionProps> = ({
         onClose={() => setSelectedProductForModal(null)}
         product={selectedProductForModal}
       />
+      {transparentDialog && (
+        <TransparentPreviewDialog
+          dialog={transparentDialog}
+          isApplying={isApplyingTransparent}
+          onApply={() => {
+            void applyTransparentPreview();
+          }}
+          onCancel={() => !isApplyingTransparent && setTransparentDialog(null)}
+        />
+      )}
     </div>
   );
 };
@@ -2089,6 +2357,43 @@ export default function AdminPanel() {
     }
   };
 
+  const updateCategoryImage = async (
+    id: number,
+    imageUrl: string,
+    parentId: number | null = null,
+  ) => {
+    try {
+      const updated = await jsonRequest<Partial<Category>>(
+        `/api/categories/${id}/image`,
+        "PATCH",
+        { image_url: imageUrl },
+      );
+      if (parentId) {
+        setMenu(
+          menu.map((cat) =>
+            cat.id === parentId
+              ? {
+                  ...cat,
+                  subcategories: cat.subcategories?.map((s) =>
+                    s.id === id ? { ...s, ...updated } : s,
+                  ),
+                }
+              : cat,
+          ),
+        );
+      } else {
+        setMenu(menu.map((c) => (c.id === id ? { ...c, ...updated } : c)));
+      }
+    } catch (error: any) {
+      console.error("Error updating category image:", error);
+      setAdminNotice({
+        type: "error",
+        message: error?.message || "Could not update category image.",
+      });
+      throw error;
+    }
+  };
+
   const addProduct = async (
     categoryId: number,
     product: ProductFormData,
@@ -2186,6 +2491,63 @@ export default function AdminPanel() {
       setAdminNotice({
         type: "error",
         message: error?.message || "Could not update product.",
+      });
+      throw error;
+    }
+  };
+
+  const updateProductImage = async (
+    productId: number,
+    categoryId: number,
+    imageUrl: string,
+    parentId: number | null = null,
+  ) => {
+    try {
+      const updatedProd = await jsonRequest<Partial<Product>>(
+        `/api/products/${productId}/image`,
+        "PATCH",
+        { image_url: imageUrl },
+      );
+
+      if (parentId) {
+        setMenu(
+          menu.map((cat) =>
+            cat.id === parentId
+              ? {
+                  ...cat,
+                  subcategories: cat.subcategories?.map((s) =>
+                    s.id === categoryId
+                      ? {
+                          ...s,
+                          products: s.products.map((p) =>
+                            p.id === productId ? { ...p, ...updatedProd } : p,
+                          ),
+                        }
+                      : s,
+                  ),
+                }
+              : cat,
+          ),
+        );
+      } else {
+        setMenu(
+          menu.map((cat) =>
+            cat.id === categoryId
+              ? {
+                  ...cat,
+                  products: cat.products.map((p) =>
+                    p.id === productId ? { ...p, ...updatedProd } : p,
+                  ),
+                }
+              : cat,
+          ),
+        );
+      }
+    } catch (error: any) {
+      console.error("Error updating product image:", error);
+      setAdminNotice({
+        type: "error",
+        message: error?.message || "Could not update product image.",
       });
       throw error;
     }
@@ -3273,8 +3635,10 @@ export default function AdminPanel() {
                   index={idx}
                   onDelete={deleteCategory}
                   onUpdateCategory={updateCategory}
+                  onUpdateCategoryImage={updateCategoryImage}
                   onAddProduct={addProduct}
                   onUpdateProduct={updateProduct}
+                  onUpdateProductImage={updateProductImage}
                   onDeleteProduct={deleteProduct}
                   onMoveProduct={moveProduct}
                   onMoveCategory={moveCategory}

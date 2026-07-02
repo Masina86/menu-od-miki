@@ -7,6 +7,7 @@ import fs from "fs";
 import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
 import crypto from "crypto";
+import sharp from "sharp";
 
 // Prefer local-only secrets file if present.
 dotenv.config({ path: ".env.local" });
@@ -418,7 +419,7 @@ async function startServer() {
       req.path.startsWith("/auth/") ||
       req.path.startsWith("/public-menu/") ||
       req.path.startsWith("/popularity/category-view") ||
-      req.path.startsWith("/images/") ||
+      (req.method === "GET" && req.path.startsWith("/images/")) ||
       (req.path.startsWith("/reviews/") && req.method !== "DELETE");
 
     if (publicApi || isAdminSessionValid(req.headers.cookie)) {
@@ -464,6 +465,213 @@ async function startServer() {
     res.setHeader("Content-Type", contentType);
     res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
     res.send(body);
+  };
+
+  const parseDataImage = (imageUrl: string) => {
+    const match = imageUrl.match(/^data:([^;,]+)?(;base64)?,(.*)$/s);
+    if (!match) return null;
+    const contentType = match[1] || "application/octet-stream";
+    const isBase64 = !!match[2];
+    const raw = match[3] || "";
+    return {
+      contentType,
+      buffer: isBase64
+        ? Buffer.from(raw, "base64")
+        : Buffer.from(decodeURIComponent(raw)),
+    };
+  };
+
+  const resolveImageBuffer = async (
+    imageUrl: string | null | undefined,
+  ): Promise<Buffer> => {
+    if (!imageUrl) throw new Error("Image is required.");
+
+    if (imageUrl.startsWith("data:")) {
+      const parsed = parseDataImage(imageUrl);
+      if (!parsed || !parsed.contentType.startsWith("image/")) {
+        throw new Error("Image must be a valid image data URL.");
+      }
+      return parsed.buffer;
+    }
+
+    const url = new URL(imageUrl);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      throw new Error("Image URL must use http or https.");
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12_000);
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+      if (!response.ok) {
+        throw new Error(`Could not download image (HTTP ${response.status}).`);
+      }
+      const contentType = response.headers.get("content-type") || "";
+      if (contentType && !contentType.startsWith("image/")) {
+        throw new Error("URL did not return an image.");
+      }
+
+      const bytes = Buffer.from(await response.arrayBuffer());
+      if (bytes.length > 12 * 1024 * 1024) {
+        throw new Error("Image is too large to process.");
+      }
+      return bytes;
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
+
+  const isTransparentBackgroundCandidate = (
+    r: number,
+    g: number,
+    b: number,
+    a: number,
+    edgeColor: { r: number; g: number; b: number },
+  ) => {
+    if (a <= 8) return true;
+    const brightness = (r + g + b) / 3;
+    const saturation = Math.max(r, g, b) - Math.min(r, g, b);
+    const distance = Math.hypot(r - edgeColor.r, g - edgeColor.g, b - edgeColor.b);
+    return (
+      (brightness >= 188 && saturation <= 92) ||
+      (brightness >= 152 && distance <= 82)
+    );
+  };
+
+  const makeBackgroundTransparent = async (input: Buffer) => {
+    const { data, info } = await sharp(input, { limitInputPixels: 36_000_000 })
+      .rotate()
+      .resize({
+        width: 1400,
+        height: 1400,
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+
+    const { width, height, channels } = info;
+    const pixelCount = width * height;
+    const background = new Uint8Array(pixelCount);
+    const queue = new Uint32Array(pixelCount);
+    const edgeSamples: Array<{ r: number; g: number; b: number }> = [];
+
+    const sampleEdgePixel = (x: number, y: number) => {
+      const offset = (y * width + x) * channels;
+      const r = data[offset];
+      const g = data[offset + 1];
+      const b = data[offset + 2];
+      const brightness = (r + g + b) / 3;
+      const saturation = Math.max(r, g, b) - Math.min(r, g, b);
+      if (brightness >= 145 && saturation <= 110) edgeSamples.push({ r, g, b });
+    };
+
+    for (let x = 0; x < width; x += 1) {
+      sampleEdgePixel(x, 0);
+      sampleEdgePixel(x, height - 1);
+    }
+    for (let y = 1; y < height - 1; y += 1) {
+      sampleEdgePixel(0, y);
+      sampleEdgePixel(width - 1, y);
+    }
+
+    const edgeColor = edgeSamples.length
+      ? edgeSamples.reduce(
+          (acc, sample) => ({
+            r: acc.r + sample.r / edgeSamples.length,
+            g: acc.g + sample.g / edgeSamples.length,
+            b: acc.b + sample.b / edgeSamples.length,
+          }),
+          { r: 0, g: 0, b: 0 },
+        )
+      : { r: 245, g: 245, b: 245 };
+
+    let head = 0;
+    let tail = 0;
+    const enqueue = (x: number, y: number) => {
+      const idx = y * width + x;
+      if (background[idx]) return;
+      const offset = idx * channels;
+      if (
+        !isTransparentBackgroundCandidate(
+          data[offset],
+          data[offset + 1],
+          data[offset + 2],
+          data[offset + 3],
+          edgeColor,
+        )
+      ) {
+        return;
+      }
+      background[idx] = 1;
+      queue[tail] = idx;
+      tail += 1;
+    };
+
+    for (let x = 0; x < width; x += 1) {
+      enqueue(x, 0);
+      enqueue(x, height - 1);
+    }
+    for (let y = 1; y < height - 1; y += 1) {
+      enqueue(0, y);
+      enqueue(width - 1, y);
+    }
+
+    while (head < tail) {
+      const idx = queue[head];
+      head += 1;
+      const x = idx % width;
+      const y = Math.floor(idx / width);
+      if (x > 0) enqueue(x - 1, y);
+      if (x < width - 1) enqueue(x + 1, y);
+      if (y > 0) enqueue(x, y - 1);
+      if (y < height - 1) enqueue(x, y + 1);
+    }
+
+    for (let idx = 0; idx < pixelCount; idx += 1) {
+      const offset = idx * channels;
+      if (background[idx]) {
+        data[offset + 3] = 0;
+        continue;
+      }
+
+      const x = idx % width;
+      const y = Math.floor(idx / width);
+      let neighboringBackground = 0;
+      for (let dy = -1; dy <= 1; dy += 1) {
+        for (let dx = -1; dx <= 1; dx += 1) {
+          if (dx === 0 && dy === 0) continue;
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+          neighboringBackground += background[ny * width + nx];
+        }
+      }
+      if (neighboringBackground > 0) {
+        data[offset + 3] = Math.max(120, data[offset + 3] - neighboringBackground * 18);
+      }
+    }
+
+    return sharp(data, { raw: { width, height, channels } })
+      .png({ compressionLevel: 9, adaptiveFiltering: true })
+      .toBuffer();
+  };
+
+  const getStoredImage = (type: string, id: any) => {
+    if (type === "product") {
+      const row = db
+        .prepare("SELECT image_url FROM products WHERE id = ?")
+        .get(id) as any;
+      return row?.image_url as string | null | undefined;
+    }
+    if (type === "category") {
+      const row = db
+        .prepare("SELECT image_url FROM categories WHERE id = ?")
+        .get(id) as any;
+      return row?.image_url as string | null | undefined;
+    }
+    throw new Error("Unsupported image type.");
   };
 
   const imageVersion = (imageUrl: string) =>
@@ -1034,6 +1242,51 @@ async function startServer() {
       .prepare(`SELECT ${field} AS image_url FROM restaurants WHERE id = ?`)
       .get(req.params.id) as any;
     dataUrlToResponse(row?.image_url, res);
+  });
+
+  app.post("/api/images/transparent-preview", async (req, res) => {
+    try {
+      const { image_url, type, id } = req.body || {};
+      const source = image_url || (type && id ? getStoredImage(type, id) : null);
+      const input = await resolveImageBuffer(source);
+      const output = await makeBackgroundTransparent(input);
+      res.json({
+        image_url: `data:image/png;base64,${output.toString("base64")}`,
+      });
+    } catch (error: any) {
+      console.error("Transparent preview error:", error);
+      res.status(400).json({
+        error: error?.message || "Could not make this image transparent.",
+      });
+    }
+  });
+
+  app.patch("/api/products/:id(\\d+)/image", (req, res) => {
+    try {
+      const imageUrl = optionalText(req.body?.image_url);
+      db.prepare("UPDATE products SET image_url = ? WHERE id = ?").run(
+        imageUrl,
+        req.params.id,
+      );
+      res.json(toJSON({ id: Number(req.params.id), image_url: imageUrl }));
+    } catch (error: any) {
+      console.error("Product image update error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/categories/:id(\\d+)/image", (req, res) => {
+    try {
+      const imageUrl = optionalText(req.body?.image_url);
+      db.prepare("UPDATE categories SET image_url = ? WHERE id = ?").run(
+        imageUrl,
+        req.params.id,
+      );
+      res.json(toJSON({ id: Number(req.params.id), image_url: imageUrl }));
+    } catch (error: any) {
+      console.error("Category image update error:", error);
+      res.status(500).json({ error: error.message });
+    }
   });
 
   app.get("/api/menu/:restaurantId", (req, res) => {
