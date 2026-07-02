@@ -562,7 +562,22 @@ const CategorySection: React.FC<CategorySectionProps> = ({
 
     reader.onload = async (event) => {
       try {
-        let text = event.target?.result as string;
+        const result = event.target?.result;
+        if (!(result instanceof ArrayBuffer)) {
+          setImportStatus({ type: "error", message: "Failed to read the file." });
+          return;
+        }
+
+        const bytes = new Uint8Array(result);
+        let text = "";
+        if (bytes[0] === 0xff && bytes[1] === 0xfe) {
+          text = new TextDecoder("utf-16le").decode(bytes.subarray(2));
+        } else if (bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
+          text = new TextDecoder("utf-8").decode(bytes.subarray(3));
+        } else {
+          text = new TextDecoder("utf-8").decode(bytes);
+        }
+
         if (!text) {
           setImportStatus({ type: "error", message: "File is empty." });
           return;
@@ -591,9 +606,15 @@ const CategorySection: React.FC<CategorySectionProps> = ({
           firstLineIdx = 1;
         } else {
           const firstLine = lines[0];
+          const tabCount = (firstLine.match(/\t/g) || []).length;
           const commaCount = (firstLine.match(/,/g) || []).length;
           const semicolonCount = (firstLine.match(/;/g) || []).length;
-          delimiter = semicolonCount > commaCount ? ";" : ",";
+          delimiter =
+            tabCount >= semicolonCount && tabCount >= commaCount
+              ? "\t"
+              : semicolonCount > commaCount
+                ? ";"
+                : ",";
         }
 
         const headers = lines[firstLineIdx].split(delimiter).map(h => h.trim().toLowerCase());
@@ -729,7 +750,7 @@ const CategorySection: React.FC<CategorySectionProps> = ({
         inputEl.value = "";
       }
     };
-    reader.readAsText(file, "UTF-8");
+    reader.readAsArrayBuffer(file);
   };
 
   const handleCsvExport = async (e: React.MouseEvent) => {
@@ -740,7 +761,7 @@ const CategorySection: React.FC<CategorySectionProps> = ({
       /[\\/:*?"<>|]+/g,
       "-",
     );
-    const filename = `${safeName}.csv`;
+    const filename = `${safeName}.tsv`;
 
     try {
       const res = await fetch(`/api/categories/${category.id}/products/export`);
@@ -846,13 +867,13 @@ const CategorySection: React.FC<CategorySectionProps> = ({
           <div className="relative">
             <button
               className={`text-stone-400 hover:text-stone-900 transition-colors p-2 ${isImporting ? "animate-spin" : ""}`}
-              title="Import Products (CSV)"
+              title="Import Products (CSV/TSV)"
             >
               {isImporting ? <Loader2 size={18} /> : <FileUp size={18} />}
             </button>
             <input
               type="file"
-              accept=".csv,.CSV,text/csv"
+              accept=".csv,.CSV,.tsv,.TSV,text/csv,text/tab-separated-values"
               className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
               onChange={handleCsvImport}
             />
@@ -860,7 +881,7 @@ const CategorySection: React.FC<CategorySectionProps> = ({
           <button
             onClick={handleCsvExport}
             className="text-stone-400 hover:text-stone-900 transition-colors p-2"
-            title="Export Products (CSV)"
+            title="Export Products (Excel TSV)"
           >
             <Download size={18} />
           </button>

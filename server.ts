@@ -1619,7 +1619,7 @@ async function startServer() {
         return;
       }
 
-      const escapeCsv = (val: any, delimiter: string) => {
+      const escapeDelimited = (val: any, delimiter: string) => {
         const s = val === null || val === undefined ? "" : String(val);
         const needsQuotes =
           s.includes('"') ||
@@ -1628,6 +1628,17 @@ async function startServer() {
           s.includes("\r");
         const escaped = s.replace(/"/g, '""');
         return needsQuotes ? `"${escaped}"` : escaped;
+      };
+
+      const escapeTsv = (val: any) =>
+        (val === null || val === undefined ? "" : String(val))
+          .replace(/\t/g, " ")
+          .replace(/\r?\n|\r/g, " ")
+          .trim();
+
+      const exportImageValue = (value: any) => {
+        const image = value === null || value === undefined ? "" : String(value).trim();
+        return image.startsWith("data:image/") ? "" : image;
       };
 
       const sanitizeAsciiFilename = (filename: string) =>
@@ -1653,10 +1664,10 @@ async function startServer() {
           .replace(/\s+/g, " ") || `category-${category.id}`;
       const asciiFilenameBase =
         sanitizeAsciiFilename(filenameBase) || `category-${category.id}`;
-      const filename = `${filenameBase}.csv`;
-      const asciiFilename = `${asciiFilenameBase}.csv`;
+      const filename = `${filenameBase}.tsv`;
+      const asciiFilename = `${asciiFilenameBase}.tsv`;
 
-      const delimiter = ";";
+      const delimiter = "\t";
       const products = db
         .prepare(
           "SELECT * FROM products WHERE category_id = ? ORDER BY sort_order, id",
@@ -1667,7 +1678,6 @@ async function startServer() {
       );
 
       const lines: string[] = [];
-      lines.push(`sep=${delimiter}`);
       lines.push(
         [
           "title",
@@ -1697,28 +1707,27 @@ async function startServer() {
           .join(";");
         lines.push(
           [
-            escapeCsv(p.name, delimiter),
-            escapeCsv(p.name_en || "", delimiter),
-            escapeCsv(p.name_bg || "", delimiter),
-            escapeCsv(p.description || "", delimiter),
-            escapeCsv(p.description_en || "", delimiter),
-            escapeCsv(p.description_bg || "", delimiter),
-            escapeCsv(p.price ?? 0, delimiter),
-            escapeCsv(p.image_url || "", delimiter),
-            escapeCsv(additionsStr, delimiter),
+            escapeTsv(p.name),
+            escapeTsv(p.name_en || ""),
+            escapeTsv(p.name_bg || ""),
+            escapeTsv(p.description || ""),
+            escapeTsv(p.description_en || ""),
+            escapeTsv(p.description_bg || ""),
+            escapeTsv(p.price ?? 0),
+            escapeTsv(exportImageValue(p.image_url)),
+            escapeDelimited(additionsStr, delimiter),
           ].join(delimiter),
         );
       }
 
-      const bom = "\uFEFF";
-      const csv = bom + lines.join("\r\n");
+      const tsv = lines.join("\r\n");
 
-      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Type", "text/tab-separated-values; charset=utf-16le");
       res.setHeader(
         "Content-Disposition",
         `attachment; filename="${asciiFilename}"; filename*=UTF-8''${encodeHeaderFilename(filename)}`,
       );
-      res.send(Buffer.from(csv, "utf8"));
+      res.send(Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(tsv, "utf16le")]));
     } catch (error: any) {
       console.error("CSV export error:", error);
       if (!res.headersSent) {
