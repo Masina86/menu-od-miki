@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import {
@@ -113,6 +113,8 @@ const isValidOptionalUrl = (value: string) => {
     return false;
   }
 };
+
+const isDataImageUrl = (value: string) => value.trim().startsWith("data:image/");
 
 const noticeClasses: Record<NoticeType, string> = {
   info: "border-blue-200 bg-blue-50 text-blue-700",
@@ -2508,18 +2510,43 @@ export default function AdminPanel() {
 
   const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
   const [cropTarget, setCropTarget] = useState<"logo" | "background" | null>(null);
+  const cropObjectUrlRef = useRef<string | null>(null);
+
+  const closeCropper = () => {
+    if (cropObjectUrlRef.current) {
+      URL.revokeObjectURL(cropObjectUrlRef.current);
+      cropObjectUrlRef.current = null;
+    }
+    setCropImageSrc(null);
+    setCropTarget(null);
+  };
+
+  const openCropper = (file: File, target: "logo" | "background") => {
+    if (cropObjectUrlRef.current) {
+      URL.revokeObjectURL(cropObjectUrlRef.current);
+    }
+    const objectUrl = URL.createObjectURL(file);
+    cropObjectUrlRef.current = objectUrl;
+    setCropImageSrc(objectUrl);
+    setCropTarget(target);
+  };
+
+  useEffect(
+    () => () => {
+      if (cropObjectUrlRef.current) {
+        URL.revokeObjectURL(cropObjectUrlRef.current);
+        cropObjectUrlRef.current = null;
+      }
+    },
+    [],
+  );
 
   const handleBackgroundUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     const target = e.target;
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setCropImageSrc(reader.result as string);
-        setCropTarget("background");
-        target.value = "";
-      };
-      reader.readAsDataURL(file);
+      openCropper(file, "background");
+      target.value = "";
     } else {
       target.value = "";
     }
@@ -2529,13 +2556,8 @@ export default function AdminPanel() {
     const file = e.target.files?.[0];
     const target = e.target;
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setCropImageSrc(reader.result as string);
-        setCropTarget("logo");
-        target.value = "";
-      };
-      reader.readAsDataURL(file);
+      openCropper(file, "logo");
+      target.value = "";
     } else {
       target.value = "";
     }
@@ -2592,6 +2614,8 @@ export default function AdminPanel() {
     objectFit: logoFit,
     objectPosition: logoObjectPosition,
   };
+  const logoInputValue = isDataImageUrl(logoUrl) ? "" : logoUrl;
+  const backgroundInputValue = isDataImageUrl(backgroundUrl) ? "" : backgroundUrl;
   const activePopularCategoryName =
     popularCategoryStats?.active_category?.name || "No winner yet";
   const currentLeaderName =
@@ -2796,9 +2820,13 @@ export default function AdminPanel() {
                       <div className="flex-1">
                         <input
                           type="text"
-                          placeholder="Or enter image URL..."
+                          placeholder={
+                            isDataImageUrl(logoUrl)
+                              ? "Uploaded logo"
+                              : "Or enter image URL..."
+                          }
                           className="w-full text-sm bg-white border border-stone-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-stone-400"
-                          value={logoUrl}
+                          value={logoInputValue}
                           onChange={(e) => {
                             setLogoUrl(e.target.value);
                             if (!e.target.value.trim()) resetLogoDisplay();
@@ -2967,9 +2995,13 @@ export default function AdminPanel() {
                       <div className="flex-1">
                         <input
                           type="text"
-                          placeholder="Or enter image URL..."
+                          placeholder={
+                            isDataImageUrl(backgroundUrl)
+                              ? "Uploaded hero image"
+                              : "Or enter image URL..."
+                          }
                           className="w-full text-sm bg-white border border-stone-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-stone-400"
-                          value={backgroundUrl}
+                          value={backgroundInputValue}
                           onChange={(e) => setBackgroundUrl(e.target.value)}
                         />
                         <p className="text-[10px] text-stone-400 mt-1 italic">
@@ -3265,19 +3297,20 @@ export default function AdminPanel() {
         <ImageCropper
           imageSrc={cropImageSrc}
           title={cropTarget === "background" ? "Crop Hero Background" : "Crop Logo"}
+          aspect={cropTarget === "background" ? 16 / 9 : undefined}
+          maxOutputWidth={cropTarget === "background" ? 1920 : 1200}
+          maxOutputHeight={cropTarget === "background" ? 1080 : 1200}
+          outputMimeType={cropTarget === "background" ? "image/jpeg" : "image/png"}
+          outputQuality={0.88}
           onCropComplete={(croppedDataUrl) => {
             if (cropTarget === "logo") {
               setLogoUrl(croppedDataUrl);
             } else if (cropTarget === "background") {
               setBackgroundUrl(croppedDataUrl);
             }
-            setCropImageSrc(null);
-            setCropTarget(null);
+            closeCropper();
           }}
-          onCancel={() => {
-            setCropImageSrc(null);
-            setCropTarget(null);
-          }}
+          onCancel={closeCropper}
         />
       )}
     </div>

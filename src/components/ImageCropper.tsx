@@ -11,11 +11,74 @@ interface ImageCropperProps {
   imageSrc: string;
   onCropComplete: (croppedDataUrl: string) => void;
   onCancel: () => void;
-  /** Optional aspect ratio lock (width/height). Omit for free crop. */
   aspect?: number;
-  /** Label shown at the top of the dialog */
   title?: string;
+  maxOutputWidth?: number;
+  maxOutputHeight?: number;
+  outputMimeType?: "image/jpeg" | "image/png" | "image/webp";
+  outputQuality?: number;
 }
+
+const getPixelCrop = (
+  image: HTMLImageElement,
+  sourceCrop?: Crop,
+): PixelCrop | undefined => {
+  if (!sourceCrop?.width || !sourceCrop?.height) return undefined;
+
+  if (sourceCrop.unit === "%") {
+    return {
+      unit: "px",
+      x: ((sourceCrop.x || 0) / 100) * image.width,
+      y: ((sourceCrop.y || 0) / 100) * image.height,
+      width: (sourceCrop.width / 100) * image.width,
+      height: (sourceCrop.height / 100) * image.height,
+    };
+  }
+
+  return {
+    unit: "px",
+    x: sourceCrop.x || 0,
+    y: sourceCrop.y || 0,
+    width: sourceCrop.width,
+    height: sourceCrop.height,
+  };
+};
+
+const fitInsideBounds = (
+  width: number,
+  height: number,
+  maxWidth: number,
+  maxHeight: number,
+) => {
+  const scale = Math.min(1, maxWidth / width, maxHeight / height);
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+  };
+};
+
+const canvasToDataUrl = (
+  canvas: HTMLCanvasElement,
+  mimeType: string,
+  quality?: number,
+) =>
+  new Promise<string>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          reject(new Error("Could not create cropped image."));
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("Could not read cropped image."));
+        reader.onload = () => resolve(String(reader.result));
+        reader.readAsDataURL(blob);
+      },
+      mimeType,
+      quality,
+    );
+  });
 
 export const ImageCropper: React.FC<ImageCropperProps> = ({
   imageSrc,
@@ -23,52 +86,57 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({
   onCancel,
   aspect,
   title = "Media",
+  maxOutputWidth = 1600,
+  maxOutputHeight = 1600,
+  outputMimeType,
+  outputQuality = 0.9,
 }) => {
   const [crop, setCrop] = useState<Crop>();
-  const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState("");
   const imgRef = useRef<HTMLImageElement>(null);
+  const completedCropRef = useRef<PixelCrop>();
 
-  /** Set an initial crop selection once the image is loaded */
   const onImageLoad = useCallback(
     (e: React.SyntheticEvent<HTMLImageElement>) => {
-      const { naturalWidth: nw, naturalHeight: nh } = e.currentTarget;
-      let initial: Crop;
+      const image = e.currentTarget;
+      const { naturalWidth: nw, naturalHeight: nh } = image;
+      const initial = aspect
+        ? centerCrop(makeAspectCrop({ unit: "%", width: 90 }, aspect, nw, nh), nw, nh)
+        : centerCrop({ unit: "%", width: 90, height: 90 }, nw, nh);
 
-      if (aspect) {
-        initial = centerCrop(
-          makeAspectCrop({ unit: "%", width: 90 }, aspect, nw, nh),
-          nw,
-          nh,
-        );
-      } else {
-        // Free crop — default to 90 % of the image, centered
-        initial = centerCrop(
-          { unit: "%", width: 90, height: 90 },
-          nw,
-          nh,
-        );
-      }
       setCrop(initial);
+      completedCropRef.current = getPixelCrop(image, initial);
     },
     [aspect],
   );
 
-  /** Draw the selected region onto a canvas and return a data-URL */
-  const handleCrop = () => {
+  const handleCrop = async () => {
     const image = imgRef.current;
-    if (!image || !completedCrop || completedCrop.width === 0 || completedCrop.height === 0) {
-      // Nothing was selected — pass the original image through unchanged
+    if (!image) {
       onCropComplete(imageSrc);
       return;
     }
 
-    // Scale factors between the natural image and the rendered <img> element
+    const activeCrop = completedCropRef.current || getPixelCrop(image, crop);
+    if (!activeCrop || activeCrop.width === 0 || activeCrop.height === 0) {
+      onCropComplete(imageSrc);
+      return;
+    }
+
+    setIsProcessing(true);
+    setError("");
+
     const scaleX = image.naturalWidth / image.width;
     const scaleY = image.naturalHeight / image.height;
-
-    // Output at natural resolution
-    const outputW = Math.round(completedCrop.width * scaleX);
-    const outputH = Math.round(completedCrop.height * scaleY);
+    const rawOutputW = Math.round(activeCrop.width * scaleX);
+    const rawOutputH = Math.round(activeCrop.height * scaleY);
+    const { width: outputW, height: outputH } = fitInsideBounds(
+      rawOutputW,
+      rawOutputH,
+      maxOutputWidth,
+      maxOutputHeight,
+    );
 
     const canvas = document.createElement("canvas");
     canvas.width = outputW;
@@ -82,24 +150,32 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({
 
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
-
     ctx.drawImage(
       image,
-      /* source */ completedCrop.x * scaleX,
-      completedCrop.y * scaleY,
-      completedCrop.width * scaleX,
-      completedCrop.height * scaleY,
-      /* destination */ 0,
+      activeCrop.x * scaleX,
+      activeCrop.y * scaleY,
+      activeCrop.width * scaleX,
+      activeCrop.height * scaleY,
+      0,
       0,
       outputW,
       outputH,
     );
 
-    // Use JPEG for photos / PNG for logos to keep transparency
-    const mime = imageSrc.startsWith("data:image/png") ? "image/png" : "image/jpeg";
-    const quality = mime === "image/jpeg" ? 0.92 : undefined;
-    const result = canvas.toDataURL(mime, quality);
-    onCropComplete(result);
+    try {
+      const mime =
+        outputMimeType ||
+        (imageSrc.startsWith("data:image/png") ? "image/png" : "image/jpeg");
+      const result = await canvasToDataUrl(
+        canvas,
+        mime,
+        mime === "image/png" ? undefined : outputQuality,
+      );
+      onCropComplete(result);
+    } catch (cropError: any) {
+      setError(cropError?.message || "Could not crop this image.");
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -108,23 +184,23 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({
       onClick={(e) => e.target === e.currentTarget && onCancel()}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+        className="bg-white rounded-lg shadow-2xl flex flex-col overflow-hidden"
         style={{ maxWidth: "min(740px, 98vw)", width: "100%", maxHeight: "95dvh" }}
       >
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-stone-100">
           <h3 className="text-base font-bold text-stone-800">{title}</h3>
         </div>
 
-        {/* Crop area */}
         <div
-          className="flex-1 overflow-auto flex items-center justify-center bg-stone-100"
+          className="flex-1 overflow-auto flex items-center justify-center bg-stone-100 p-3"
           style={{ minHeight: 260 }}
         >
           <ReactCrop
             crop={crop}
             onChange={(_, pct) => setCrop(pct)}
-            onComplete={(px) => setCompletedCrop(px)}
+            onComplete={(px) => {
+              completedCropRef.current = px;
+            }}
             aspect={aspect}
             ruleOfThirds
             style={{ maxHeight: "65dvh" }}
@@ -134,27 +210,39 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({
               src={imageSrc}
               onLoad={onImageLoad}
               alt="Crop"
-              style={{ maxHeight: "65dvh", maxWidth: "100%", display: "block" }}
+              decoding="async"
+              style={{
+                maxHeight: "65dvh",
+                maxWidth: "100%",
+                display: "block",
+                userSelect: "none",
+              }}
             />
           </ReactCrop>
         </div>
 
-        {/* Footer buttons */}
-        <div className="flex items-center gap-3 px-6 py-4 border-t border-stone-100">
+        <div className="flex flex-wrap items-center gap-3 px-6 py-4 border-t border-stone-100">
+          {error ? (
+            <p className="mr-auto text-xs font-medium text-red-500">{error}</p>
+          ) : (
+            <div className="mr-auto" />
+          )}
           <button
             type="button"
             onClick={onCancel}
-            className="px-6 py-2 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-700 text-sm font-medium transition-colors"
+            disabled={isProcessing}
+            className="px-5 py-2 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 text-sm font-medium transition-colors disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={handleCrop}
-            className="px-6 py-2 rounded-full text-sm font-medium text-white transition-colors"
+            disabled={isProcessing}
+            className="min-w-24 px-5 py-2 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-60"
             style={{ background: "#0088ff" }}
           >
-            Crop
+            {isProcessing ? "Cropping..." : "Crop"}
           </button>
         </div>
       </div>
