@@ -1608,82 +1608,123 @@ async function startServer() {
   // ─── CSV EXPORT ────────────────────────────────────────────────────────────
 
   app.get("/api/categories/:categoryId/products/export", (req, res) => {
-    const { categoryId } = req.params;
+    try {
+      const { categoryId } = req.params;
 
-    const category = db
-      .prepare("SELECT * FROM categories WHERE id = ?")
-      .get(categoryId) as any;
-    if (!category) {
-      res.status(404).json({ error: "Category not found" });
-      return;
+      const category = db
+        .prepare("SELECT * FROM categories WHERE id = ?")
+        .get(categoryId) as any;
+      if (!category) {
+        res.status(404).json({ error: "Category not found" });
+        return;
+      }
+
+      const escapeCsv = (val: any, delimiter: string) => {
+        const s = val === null || val === undefined ? "" : String(val);
+        const needsQuotes =
+          s.includes('"') ||
+          s.includes(delimiter) ||
+          s.includes("\n") ||
+          s.includes("\r");
+        const escaped = s.replace(/"/g, '""');
+        return needsQuotes ? `"${escaped}"` : escaped;
+      };
+
+      const sanitizeAsciiFilename = (filename: string) =>
+        filename
+          .normalize("NFKD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^\x20-\x7e]+/g, "")
+          .replace(/[\\/:*?"<>|]+/g, "-")
+          .replace(/\s+/g, " ")
+          .trim();
+
+      const encodeHeaderFilename = (filename: string) =>
+        encodeURIComponent(filename)
+          .replace(/['()]/g, (char) =>
+            `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
+          )
+          .replace(/\*/g, "%2A");
+
+      const filenameBase =
+        String(category.name || `category-${category.id}`)
+          .trim()
+          .replace(/[\\/:*?"<>|]+/g, "-")
+          .replace(/\s+/g, " ") || `category-${category.id}`;
+      const asciiFilenameBase =
+        sanitizeAsciiFilename(filenameBase) || `category-${category.id}`;
+      const filename = `${filenameBase}.csv`;
+      const asciiFilename = `${asciiFilenameBase}.csv`;
+
+      const delimiter = ";";
+      const products = db
+        .prepare(
+          "SELECT * FROM products WHERE category_id = ? ORDER BY sort_order, id",
+        )
+        .all(categoryId) as any[];
+      const getAdditions = db.prepare(
+        "SELECT * FROM additions WHERE product_id = ? ORDER BY id",
+      );
+
+      const lines: string[] = [];
+      lines.push(`sep=${delimiter}`);
+      lines.push(
+        [
+          "title",
+          "title_en",
+          "title_bg",
+          "description",
+          "description_en",
+          "description_bg",
+          "price",
+          "image",
+          "additions",
+        ].join(delimiter),
+      );
+
+      for (const p of products) {
+        const additions = getAdditions.all(p.id) as any[];
+        const additionsStr = (additions || [])
+          .map((a) => {
+            const hasTranslations =
+              (a.name_en && String(a.name_en).trim() !== "") ||
+              (a.name_bg && String(a.name_bg).trim() !== "");
+            const namePart = hasTranslations
+              ? `${a.name}|${a.name_en || ""}|${a.name_bg || ""}`
+              : `${a.name}`;
+            return `${namePart}:${a.price}`;
+          })
+          .join(";");
+        lines.push(
+          [
+            escapeCsv(p.name, delimiter),
+            escapeCsv(p.name_en || "", delimiter),
+            escapeCsv(p.name_bg || "", delimiter),
+            escapeCsv(p.description || "", delimiter),
+            escapeCsv(p.description_en || "", delimiter),
+            escapeCsv(p.description_bg || "", delimiter),
+            escapeCsv(p.price ?? 0, delimiter),
+            escapeCsv(p.image_url || "", delimiter),
+            escapeCsv(additionsStr, delimiter),
+          ].join(delimiter),
+        );
+      }
+
+      const bom = "\uFEFF";
+      const csv = bom + lines.join("\r\n");
+
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${asciiFilename}"; filename*=UTF-8''${encodeHeaderFilename(filename)}`,
+      );
+      res.send(Buffer.from(csv, "utf8"));
+    } catch (error: any) {
+      console.error("CSV export error:", error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: error.message || "Export failed" });
+      }
     }
-
-    const escapeCsv = (val: any, delimiter: string) => {
-      const s = val === null || val === undefined ? "" : String(val);
-      const needsQuotes =
-        s.includes('"') ||
-        s.includes(delimiter) ||
-        s.includes("\n") ||
-        s.includes("\r");
-      const escaped = s.replace(/"/g, '""');
-      return needsQuotes ? `"${escaped}"` : escaped;
-    };
-
-    const safeFilenameBase =
-      String(category.name || `category-${category.id}`)
-        .trim()
-        .replace(/[\\/:*?"<>|]+/g, "-")
-        .replace(/\s+/g, " ") || `category-${category.id}`;
-
-    const delimiter = ";";
-    const products = db
-      .prepare(
-        "SELECT * FROM products WHERE category_id = ? ORDER BY sort_order, id",
-      )
-      .all(categoryId) as any[];
-    const getAdditions = db.prepare(
-      "SELECT * FROM additions WHERE product_id = ? ORDER BY id",
-    );
-
-    const lines: string[] = [];
-    lines.push('sep=,');
-    lines.push('title,title_en,title_bg,description,description_en,description_bg,price,image,additions');
-
-    for (const p of products) {
-      const additions = getAdditions.all(p.id) as any[];
-      const additionsStr = (additions || [])
-        .map((a) => {
-          const hasTranslations =
-            (a.name_en && String(a.name_en).trim() !== "") ||
-            (a.name_bg && String(a.name_bg).trim() !== "");
-          const namePart = hasTranslations
-            ? `${a.name}|${a.name_en || ""}|${a.name_bg || ""}`
-            : `${a.name}`;
-          return `${namePart}:${a.price}`;
-        })
-        .join(';');
-      lines.push([
-        escapeCsv(p.name, delimiter),
-        escapeCsv(p.name_en || '', delimiter),
-        escapeCsv(p.name_bg || '', delimiter),
-        escapeCsv(p.description || '', delimiter),
-        escapeCsv(p.description_en || '', delimiter),
-        escapeCsv(p.description_bg || '', delimiter),
-        escapeCsv(p.price ?? 0, delimiter),
-        escapeCsv(p.image_url || '', delimiter),
-        escapeCsv(additionsStr, delimiter),
-      ].join(delimiter));
-    }
-
-    const bom = "\uFEFF";
-    const csv = bom + lines.join("\r\n");
-
-    res.setHeader("Content-Type", "application/vnd.ms-excel; charset=utf-8");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${safeFilenameBase}.csv"`,
-    );
-    res.send(Buffer.from(csv, "utf8"));
   });
 
   // ─── REVIEWS ───────────────────────────────────────────────────────────────
