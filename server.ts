@@ -526,16 +526,74 @@ async function startServer() {
     g: number,
     b: number,
     a: number,
-    edgeColor: { r: number; g: number; b: number },
+    edgeColor: { r: number; g: number; b: number; count: number },
   ) => {
     if (a <= 8) return true;
     const brightness = (r + g + b) / 3;
     const saturation = Math.max(r, g, b) - Math.min(r, g, b);
+    const edgeBrightness = (edgeColor.r + edgeColor.g + edgeColor.b) / 3;
+    const edgeSaturation =
+      Math.max(edgeColor.r, edgeColor.g, edgeColor.b) -
+      Math.min(edgeColor.r, edgeColor.g, edgeColor.b);
     const distance = Math.hypot(r - edgeColor.r, g - edgeColor.g, b - edgeColor.b);
-    return (
-      (brightness >= 188 && saturation <= 92) ||
-      (brightness >= 152 && distance <= 82)
+    const channelDistance = Math.max(
+      Math.abs(r - edgeColor.r),
+      Math.abs(g - edgeColor.g),
+      Math.abs(b - edgeColor.b),
     );
+    const brightnessDistance = Math.abs(brightness - edgeBrightness);
+    const tolerance = edgeBrightness < 70 ? 54 : edgeBrightness > 210 ? 66 : 82;
+
+    return (
+      distance <= tolerance ||
+      (channelDistance <= 48 && brightnessDistance <= 64) ||
+      (edgeBrightness >= 230 &&
+        edgeSaturation <= 36 &&
+        brightness >= 232 &&
+        saturation <= 42)
+    );
+  };
+
+  const buildEdgePalette = (
+    data: Buffer,
+    width: number,
+    height: number,
+    channels: number,
+  ) => {
+    const buckets = new Map<string, { r: number; g: number; b: number; count: number }>();
+    const addSample = (x: number, y: number) => {
+      const offset = (y * width + x) * channels;
+      const r = data[offset];
+      const g = data[offset + 1];
+      const b = data[offset + 2];
+      const key = `${Math.round(r / 24)}:${Math.round(g / 24)}:${Math.round(b / 24)}`;
+      const bucket = buckets.get(key) || { r: 0, g: 0, b: 0, count: 0 };
+      bucket.r += r;
+      bucket.g += g;
+      bucket.b += b;
+      bucket.count += 1;
+      buckets.set(key, bucket);
+    };
+
+    for (let x = 0; x < width; x += 1) {
+      addSample(x, 0);
+      addSample(x, height - 1);
+    }
+    for (let y = 1; y < height - 1; y += 1) {
+      addSample(0, y);
+      addSample(width - 1, y);
+    }
+
+    return [...buckets.values()]
+      .filter((bucket) => bucket.count >= 2)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 18)
+      .map((bucket) => ({
+        r: bucket.r / bucket.count,
+        g: bucket.g / bucket.count,
+        b: bucket.b / bucket.count,
+        count: bucket.count,
+      }));
   };
 
   const makeBackgroundTransparent = async (input: Buffer) => {
@@ -555,79 +613,98 @@ async function startServer() {
     const pixelCount = width * height;
     const background = new Uint8Array(pixelCount);
     const queue = new Uint32Array(pixelCount);
-    const edgeSamples: Array<{ r: number; g: number; b: number }> = [];
+    const edgePalette = buildEdgePalette(data, width, height, channels);
 
-    const sampleEdgePixel = (x: number, y: number) => {
-      const offset = (y * width + x) * channels;
-      const r = data[offset];
-      const g = data[offset + 1];
-      const b = data[offset + 2];
-      const brightness = (r + g + b) / 3;
-      const saturation = Math.max(r, g, b) - Math.min(r, g, b);
-      if (brightness >= 145 && saturation <= 110) edgeSamples.push({ r, g, b });
-    };
+    const fillBackgroundCluster = (edgeColor: {
+      r: number;
+      g: number;
+      b: number;
+      count: number;
+    }) => {
+      const visited = new Uint8Array(pixelCount);
+      let head = 0;
+      let tail = 0;
+      const enqueue = (x: number, y: number) => {
+        const idx = y * width + x;
+        if (visited[idx] || background[idx]) return;
+        visited[idx] = 1;
+        const offset = idx * channels;
+        if (
+          !isTransparentBackgroundCandidate(
+            data[offset],
+            data[offset + 1],
+            data[offset + 2],
+            data[offset + 3],
+            edgeColor,
+          )
+        ) {
+          return;
+        }
+        background[idx] = 1;
+        queue[tail] = idx;
+        tail += 1;
+      };
 
-    for (let x = 0; x < width; x += 1) {
-      sampleEdgePixel(x, 0);
-      sampleEdgePixel(x, height - 1);
-    }
-    for (let y = 1; y < height - 1; y += 1) {
-      sampleEdgePixel(0, y);
-      sampleEdgePixel(width - 1, y);
-    }
-
-    const edgeColor = edgeSamples.length
-      ? edgeSamples.reduce(
-          (acc, sample) => ({
-            r: acc.r + sample.r / edgeSamples.length,
-            g: acc.g + sample.g / edgeSamples.length,
-            b: acc.b + sample.b / edgeSamples.length,
-          }),
-          { r: 0, g: 0, b: 0 },
-        )
-      : { r: 245, g: 245, b: 245 };
-
-    let head = 0;
-    let tail = 0;
-    const enqueue = (x: number, y: number) => {
-      const idx = y * width + x;
-      if (background[idx]) return;
-      const offset = idx * channels;
-      if (
-        !isTransparentBackgroundCandidate(
-          data[offset],
-          data[offset + 1],
-          data[offset + 2],
-          data[offset + 3],
-          edgeColor,
-        )
-      ) {
-        return;
+      for (let x = 0; x < width; x += 1) {
+        enqueue(x, 0);
+        enqueue(x, height - 1);
       }
-      background[idx] = 1;
-      queue[tail] = idx;
-      tail += 1;
+      for (let y = 1; y < height - 1; y += 1) {
+        enqueue(0, y);
+        enqueue(width - 1, y);
+      }
+
+      while (head < tail) {
+        const idx = queue[head];
+        head += 1;
+        const x = idx % width;
+        const y = Math.floor(idx / width);
+        if (x > 0) enqueue(x - 1, y);
+        if (x < width - 1) enqueue(x + 1, y);
+        if (y > 0) enqueue(x, y - 1);
+        if (y < height - 1) enqueue(x, y + 1);
+      }
     };
 
-    for (let x = 0; x < width; x += 1) {
-      enqueue(x, 0);
-      enqueue(x, height - 1);
-    }
-    for (let y = 1; y < height - 1; y += 1) {
-      enqueue(0, y);
-      enqueue(width - 1, y);
+    for (const edgeColor of edgePalette) {
+      fillBackgroundCluster(edgeColor);
     }
 
-    while (head < tail) {
-      const idx = queue[head];
-      head += 1;
-      const x = idx % width;
-      const y = Math.floor(idx / width);
-      if (x > 0) enqueue(x - 1, y);
-      if (x < width - 1) enqueue(x + 1, y);
-      if (y > 0) enqueue(x, y - 1);
-      if (y < height - 1) enqueue(x, y + 1);
-    }
+    const fillAlreadyTransparentEdges = () => {
+      let head = 0;
+      let tail = 0;
+      const enqueue = (x: number, y: number) => {
+        const idx = y * width + x;
+        if (background[idx]) return;
+        const offset = idx * channels;
+        if (data[offset + 3] > 8) return;
+        background[idx] = 1;
+        queue[tail] = idx;
+        tail += 1;
+      };
+
+      for (let x = 0; x < width; x += 1) {
+        enqueue(x, 0);
+        enqueue(x, height - 1);
+      }
+      for (let y = 1; y < height - 1; y += 1) {
+        enqueue(0, y);
+        enqueue(width - 1, y);
+      }
+
+      while (head < tail) {
+        const idx = queue[head];
+        head += 1;
+        const x = idx % width;
+        const y = Math.floor(idx / width);
+        if (x > 0) enqueue(x - 1, y);
+        if (x < width - 1) enqueue(x + 1, y);
+        if (y > 0) enqueue(x, y - 1);
+        if (y < height - 1) enqueue(x, y + 1);
+      }
+    };
+
+    fillAlreadyTransparentEdges();
 
     for (let idx = 0; idx < pixelCount; idx += 1) {
       const offset = idx * channels;
