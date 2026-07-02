@@ -3807,8 +3807,8 @@ export default function AdminPanel() {
             <div className="space-y-2">
               <label className="text-[10px] uppercase tracking-widest text-stone-400 font-bold block">Allergens</label>
               <AllergenPicker
-                selected={takeoverAllergens ? takeoverAllergens.split(",") : []}
-                onChange={(allergens) => setTakeoverAllergens(allergens.join(","))}
+                value={takeoverAllergens}
+                onChange={setTakeoverAllergens}
               />
             </div>
 
