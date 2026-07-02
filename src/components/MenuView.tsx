@@ -885,15 +885,43 @@ export default function MenuView() {
   const [isAtTop, setIsAtTop] = useState(true);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [showTakeover, setShowTakeover] = useState(false);
+  const [isTakeoverReady, setIsTakeoverReady] = useState(false);
 
   useEffect(() => {
-    if (restaurant && restaurant.takeover_enabled) {
-      const shownKey = `takeover_${restaurant.id}`;
-      if (!sessionStorage.getItem(shownKey)) {
-        setShowTakeover(true);
-        sessionStorage.setItem(shownKey, "1");
-      }
+    if (!restaurant || !restaurant.takeover_enabled) return;
+
+    const shownKey = `takeover_${restaurant.id}`;
+    if (sessionStorage.getItem(shownKey)) return;
+
+    sessionStorage.setItem(shownKey, "1");
+    setShowTakeover(true);
+
+    const imageUrl = restaurant.takeover_image_url?.trim();
+    if (!imageUrl) {
+      setIsTakeoverReady(true);
+      return;
     }
+
+    setIsTakeoverReady(false);
+    let cancelled = false;
+    let didSettle = false;
+    const reveal = () => {
+      if (cancelled || didSettle) return;
+      didSettle = true;
+      setIsTakeoverReady(true);
+    };
+    const image = new Image();
+    image.onload = reveal;
+    image.onerror = reveal;
+    image.src = imageUrl;
+    const fallbackTimer = window.setTimeout(reveal, 900);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(fallbackTimer);
+      image.onload = null;
+      image.onerror = null;
+    };
   }, [restaurant]);
   // Persist dark mode
   useEffect(() => {
@@ -911,6 +939,11 @@ export default function MenuView() {
 
   const selectCategory = useCallback((id: number) => {
     setActiveCategoryId(id);
+  }, []);
+
+  const closeTakeover = useCallback(() => {
+    setShowTakeover(false);
+    setIsTakeoverReady(false);
   }, []);
 
   // Scroll detection
@@ -1661,82 +1694,101 @@ export default function MenuView() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
-              onClick={() => setShowTakeover(false)}
+              transition={{ duration: 0.12, ease: "easeOut" }}
+              className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/85 backdrop-blur-2xl"
+              onClick={closeTakeover}
             >
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0, y: 20 }}
-                animate={{ scale: 1, opacity: 1, y: 0 }}
-                exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                className={`relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl shadow-2xl ${darkMode ? "bg-stone-900 text-stone-100" : "bg-white text-stone-900"}`}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button
-                  type="button"
-                  className="absolute top-4 right-4 z-10 flex items-center justify-center w-10 h-10 rounded-full bg-black/50 text-white backdrop-blur-md hover:bg-black/70 transition-colors"
-                  onClick={() => setShowTakeover(false)}
-                >
-                  <X size={20} />
-                </button>
+              <AnimatePresence mode="wait">
+                {!isTakeoverReady ? (
+                  <motion.div
+                    key="takeover-preparing"
+                    initial={{ opacity: 0, scale: 0.96 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
+                    transition={{ duration: 0.12, ease: "easeOut" }}
+                    className="h-12 w-12 rounded-full border border-white/20 bg-white/10 shadow-2xl backdrop-blur-md"
+                  >
+                    <div className="h-full w-full animate-pulse rounded-full bg-white/20" />
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="takeover-card"
+                    initial={{ scale: 0.96, opacity: 0, y: 8 }}
+                    animate={{ scale: 1, opacity: 1, y: 0 }}
+                    exit={{ scale: 0.96, opacity: 0, y: 8 }}
+                    transition={{ type: "spring", damping: 32, stiffness: 520 }}
+                    className={`relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl shadow-2xl ${darkMode ? "bg-stone-900 text-stone-100" : "bg-white text-stone-900"}`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      className="absolute top-4 right-4 z-10 flex items-center justify-center w-10 h-10 rounded-full bg-black/50 text-white backdrop-blur-md hover:bg-black/70 transition-colors"
+                      onClick={closeTakeover}
+                    >
+                      <X size={20} />
+                    </button>
 
-                {restaurant.takeover_image_url && (
-                  <div className="w-full aspect-[4/3] sm:aspect-video relative overflow-hidden">
-                    <img
-                      src={restaurant.takeover_image_url}
-                      alt={restaurant.takeover_title || "Promo"}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
-                  </div>
-                )}
-
-                <div
-                  className={`p-6 ${restaurant.takeover_image_url ? "-mt-8 relative z-10" : ""}`}
-                >
-                  <div className="flex flex-col items-center text-center gap-3">
-                    {restaurant.takeover_title && (
-                      <h2 className="text-2xl font-black uppercase tracking-wide">
-                        {restaurant.takeover_title}
-                      </h2>
-                    )}
-
-                    {restaurant.takeover_message && (
-                      <p
-                        className={`text-sm md:text-base ${darkMode ? "text-stone-300" : "text-stone-600"}`}
-                      >
-                        {restaurant.takeover_message}
-                      </p>
-                    )}
-
-                    {restaurant.takeover_price && (
-                      <div className="mt-2 inline-block px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full font-bold shadow-md">
-                        {restaurant.takeover_price}
+                    {restaurant.takeover_image_url && (
+                      <div className="w-full aspect-[4/3] sm:aspect-video relative overflow-hidden">
+                        <img
+                          src={restaurant.takeover_image_url}
+                          alt={restaurant.takeover_title || "Promo"}
+                          className="w-full h-full object-cover"
+                          decoding="async"
+                          fetchPriority="high"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
                       </div>
                     )}
 
-                    {restaurant.takeover_allergens && (
-                      <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-                        <span
-                          className={`text-[10px] font-bold uppercase tracking-widest ${darkMode ? "text-stone-500" : "text-stone-400"}`}
-                        >
-                          {t("allergens", language)}:
-                        </span>
-                        {getAllergenList(restaurant.takeover_allergens).map(
-                          (a) => (
-                            <AllergenBadge
-                              key={a}
-                              allergenKey={a}
-                              darkMode={darkMode}
-                              language={language}
-                            />
-                          ),
+                    <div
+                      className={`p-6 ${restaurant.takeover_image_url ? "-mt-8 relative z-10" : ""}`}
+                    >
+                      <div className="flex flex-col items-center text-center gap-3">
+                        {restaurant.takeover_title && (
+                          <h2 className="text-2xl font-black uppercase tracking-wide">
+                            {restaurant.takeover_title}
+                          </h2>
+                        )}
+
+                        {restaurant.takeover_message && (
+                          <p
+                            className={`text-sm md:text-base ${darkMode ? "text-stone-300" : "text-stone-600"}`}
+                          >
+                            {restaurant.takeover_message}
+                          </p>
+                        )}
+
+                        {restaurant.takeover_price && (
+                          <div className="mt-2 inline-block px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full font-bold shadow-md">
+                            {restaurant.takeover_price}
+                          </div>
+                        )}
+
+                        {restaurant.takeover_allergens && (
+                          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                            <span
+                              className={`text-[10px] font-bold uppercase tracking-widest ${darkMode ? "text-stone-500" : "text-stone-400"}`}
+                            >
+                              {t("allergens", language)}:
+                            </span>
+                            {getAllergenList(restaurant.takeover_allergens).map(
+                              (a) => (
+                                <AllergenBadge
+                                  key={a}
+                                  allergenKey={a}
+                                  darkMode={darkMode}
+                                  language={language}
+                                />
+                              ),
+                            )}
+                          </div>
                         )}
                       </div>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
           )}
         </AnimatePresence>
