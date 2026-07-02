@@ -283,38 +283,32 @@ const PopularBadge: React.FC<{ compact?: boolean }> = ({ compact = false }) => (
 
 const MenuSkeleton: React.FC<{ darkMode: boolean }> = ({ darkMode }) => (
   <div
-    className={`min-h-screen px-4 py-8 ${darkMode ? "bg-stone-900" : "bg-[#fcfbf7]"}`}
+    className={`min-h-screen fixed inset-0 z-[120] flex items-center justify-center overflow-hidden ${
+      darkMode ? "bg-stone-950" : "bg-stone-100"
+    }`}
   >
-    <div className="max-w-2xl mx-auto space-y-5 animate-pulse">
+    <div
+      className={`absolute inset-0 ${
+        darkMode
+          ? "bg-[radial-gradient(circle_at_50%_30%,rgba(68,64,60,0.35),transparent_38%),linear-gradient(180deg,rgba(12,10,9,0.92),rgba(12,10,9,1))]"
+          : "bg-[radial-gradient(circle_at_50%_30%,rgba(214,211,209,0.6),transparent_38%),linear-gradient(180deg,rgba(245,245,244,0.92),rgba(250,250,249,1))]"
+      }`}
+    />
+    <div
+      className={`relative h-16 w-16 rounded-full border ${
+        darkMode ? "border-white/10 bg-white/5" : "border-stone-300/70 bg-white/70"
+      } shadow-2xl backdrop-blur-xl`}
+    >
       <div
-        className={`h-56 rounded-b-[2rem] ${darkMode ? "bg-stone-800" : "bg-stone-100"}`}
+        className={`absolute inset-3 animate-ping rounded-full ${
+          darkMode ? "bg-white/20" : "bg-stone-500/20"
+        }`}
       />
-      {[0, 1, 2, 3].map((i) => (
-        <div
-          key={i}
-          className={`rounded-2xl border p-4 ${darkMode ? "border-stone-700" : "border-stone-100"}`}
-        >
-          <div
-            className={`h-5 w-40 rounded ${darkMode ? "bg-stone-700" : "bg-stone-200"}`}
-          />
-          <div className="mt-4 flex gap-4">
-            <div
-              className={`h-20 w-20 rounded-2xl ${darkMode ? "bg-stone-800" : "bg-stone-100"}`}
-            />
-            <div className="flex-1 space-y-3">
-              <div
-                className={`h-4 w-3/4 rounded ${darkMode ? "bg-stone-700" : "bg-stone-200"}`}
-              />
-              <div
-                className={`h-3 w-full rounded ${darkMode ? "bg-stone-800" : "bg-stone-100"}`}
-              />
-              <div
-                className={`h-3 w-2/3 rounded ${darkMode ? "bg-stone-800" : "bg-stone-100"}`}
-              />
-            </div>
-          </div>
-        </div>
-      ))}
+      <div
+        className={`absolute inset-5 rounded-full ${
+          darkMode ? "bg-white/35" : "bg-stone-700/45"
+        }`}
+      />
     </div>
   </div>
 );
@@ -1695,7 +1689,7 @@ export default function MenuView() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.12, ease: "easeOut" }}
-              className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/85 backdrop-blur-2xl"
+              className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-[28px]"
               onClick={closeTakeover}
             >
               <AnimatePresence mode="wait">
