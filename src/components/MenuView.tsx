@@ -1093,8 +1093,11 @@ export default function MenuView() {
     maxWidth: "82vw",
     objectFit: logoFit,
     objectPosition: logoObjectPosition,
-    transform: logoFit === "contain" ? `translateY(${logoPositionY - 50}%)` : "none",
   } as React.CSSProperties;
+  
+  const heroLogoTransformStyle = {
+    transform: logoFit === "contain" ? `translateY(${logoPositionY - 50}%)` : "none",
+  };
   const footerLogoStyle: React.CSSProperties = {
     height: `${Math.round(112 * logoScale)}px`,
     width:
@@ -1359,15 +1362,17 @@ export default function MenuView() {
             className="relative z-10 w-full max-w-2xl text-center px-4 pt-[calc(env(safe-area-inset-top)+5rem)] pb-[30px] sm:px-6 sm:pt-[calc(env(safe-area-inset-top)+5.5rem)] sm:pb-[46px] md:pb-[30px] lg:pb-8"
           >
             {restaurant.logo_url ? (
-              <motion.img
-                variants={heroLogoVariants}
-                src={restaurant.logo_url}
-                alt={restaurant.name}
-                loading="eager"
-                decoding="async"
-                className="mx-auto mb-3 h-[var(--hero-logo-mobile-height)] drop-shadow-2xl sm:mb-4 sm:h-[var(--hero-logo-tablet-height)] lg:mb-6 lg:h-[var(--hero-logo-desktop-height)]"
-                style={heroLogoStyle}
-              />
+              <div style={heroLogoTransformStyle}>
+                <motion.img
+                  variants={heroLogoVariants}
+                  src={restaurant.logo_url}
+                  alt={restaurant.name}
+                  loading="eager"
+                  decoding="async"
+                  className="mx-auto mb-3 h-[var(--hero-logo-mobile-height)] drop-shadow-2xl sm:mb-4 sm:h-[var(--hero-logo-tablet-height)] lg:mb-6 lg:h-[var(--hero-logo-desktop-height)]"
+                  style={heroLogoStyle}
+                />
+              </div>
             ) : (
               <motion.p
                 variants={heroItemVariants}
