@@ -11,6 +11,7 @@ import {
   ChevronUp,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   AlertTriangle,
   GripVertical,
   FileUp,
@@ -25,6 +26,7 @@ import {
   Star,
   Wand2,
   Sparkles,
+  Upload,
 } from "lucide-react";
 import { motion, AnimatePresence, Reorder } from "motion/react";
 import { Restaurant, Category, Product, LogoFit } from "../types";
@@ -3542,6 +3544,203 @@ export default function AdminPanel() {
             <p className="text-2xl font-serif mt-1">
               {adminStats.productsWithoutImages}
             </p>
+          </div>
+        </section>
+
+        {/* ── Logo & Brand ────────────────────────────────── */}
+        <section className="mb-8 rounded-xl border border-stone-200 bg-white px-6 py-5">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-stone-100 text-stone-600">
+              <ImageIcon size={16} />
+            </div>
+            <p className="text-sm font-bold text-stone-900">Logo</p>
+          </div>
+
+          <div className="flex flex-col md:flex-row gap-6">
+            {/* Logo thumbnail - clickable */}
+            <div className="flex-shrink-0 flex flex-col items-center gap-2">
+              <div className="relative group rounded-2xl border-2 border-dashed border-stone-200 bg-stone-50 w-28 h-28 flex items-center justify-center overflow-hidden shadow-sm hover:border-stone-400 transition-colors cursor-pointer">
+                {logoUrl ? (
+                  <>
+                    <img
+                      src={logoUrl}
+                      alt="Logo Preview"
+                      className="w-full h-full"
+                      style={{ objectFit: logoFit, objectPosition: logoObjectPosition }}
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                      <Upload size={18} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); clearLogo(); }}
+                      className="absolute top-1 right-1 bg-white/90 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow"
+                      title="Remove logo"
+                    >
+                      <X size={12} />
+                    </button>
+                    <input
+                      type="file"
+                      accept={ACCEPTED_IMAGE_FORMATS}
+                      className="absolute inset-0 opacity-0 cursor-pointer z-20"
+                      onChange={handleLogoUpload}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <div className="flex flex-col items-center gap-1 text-stone-300">
+                      <ImageIcon size={24} />
+                      <span className="text-[9px] font-bold uppercase tracking-widest">Upload Logo</span>
+                    </div>
+                    <input
+                      type="file"
+                      accept={ACCEPTED_IMAGE_FORMATS}
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                      onChange={handleLogoUpload}
+                    />
+                  </>
+                )}
+              </div>
+              {logoUrl && (
+                <div className="inline-flex rounded-full border border-stone-200 bg-stone-50 p-0.5 gap-0.5">
+                  {(["contain", "cover"] as const).map((fit) => (
+                    <button
+                      key={fit}
+                      type="button"
+                      onClick={() => setLogoFit(fit)}
+                      className={`rounded-full px-3 py-1 text-[9px] font-bold uppercase tracking-wide transition-colors ${
+                        logoFit === fit ? "bg-stone-900 text-white shadow-sm" : "text-stone-500 hover:text-stone-800"
+                      }`}
+                    >
+                      {fit === "contain" ? "Fit" : "Crop"}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Sliders */}
+            {logoUrl ? (
+              <div className="flex-1 space-y-4">
+                {/* Size */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Size</label>
+                    <span className="text-[11px] font-semibold text-stone-600 bg-stone-100 px-2 py-0.5 rounded-full">{logoSize}%</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setLogoSize(Math.max(MIN_LOGO_SIZE, logoSize - 5))}
+                      className="flex-shrink-0 w-7 h-7 rounded-full border border-stone-200 bg-white text-stone-600 hover:bg-stone-100 flex items-center justify-center text-lg font-bold leading-none"
+                      title="Decrease size"
+                    >−</button>
+                    <input
+                      type="range"
+                      min={MIN_LOGO_SIZE}
+                      max={MAX_LOGO_SIZE}
+                      step="5"
+                      value={logoSize}
+                      onChange={(e) => setLogoSize(Number(e.target.value))}
+                      className="flex-1 accent-stone-900 h-1.5"
+                      aria-label="Logo size"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setLogoSize(Math.min(MAX_LOGO_SIZE, logoSize + 5))}
+                      className="flex-shrink-0 w-7 h-7 rounded-full border border-stone-200 bg-white text-stone-600 hover:bg-stone-100 flex items-center justify-center text-lg font-bold leading-none"
+                      title="Increase size"
+                    >+</button>
+                  </div>
+                </div>
+
+                {/* Vertical position (Up/Down) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Position ↕</label>
+                    <span className="text-[11px] font-semibold text-stone-600 bg-stone-100 px-2 py-0.5 rounded-full">{logoPositionY}%</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setLogoPositionY(Math.max(0, logoPositionY - 5))}
+                      className="flex-shrink-0 w-7 h-7 rounded-full border border-stone-200 bg-white text-stone-600 hover:bg-stone-100 flex items-center justify-center"
+                      title="Move up"
+                    ><ChevronUp size={14} /></button>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="5"
+                      value={logoPositionY}
+                      onChange={(e) => setLogoPositionY(Number(e.target.value))}
+                      className="flex-1 accent-stone-900 h-1.5"
+                      aria-label="Logo vertical position"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setLogoPositionY(Math.min(100, logoPositionY + 5))}
+                      className="flex-shrink-0 w-7 h-7 rounded-full border border-stone-200 bg-white text-stone-600 hover:bg-stone-100 flex items-center justify-center"
+                      title="Move down"
+                    ><ChevronDown size={14} /></button>
+                  </div>
+                </div>
+
+                {/* Horizontal position (Left/Right) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Position ↔</label>
+                    <span className="text-[11px] font-semibold text-stone-600 bg-stone-100 px-2 py-0.5 rounded-full">{logoPositionX}%</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setLogoPositionX(Math.max(0, logoPositionX - 5))}
+                      className="flex-shrink-0 w-7 h-7 rounded-full border border-stone-200 bg-white text-stone-600 hover:bg-stone-100 flex items-center justify-center"
+                      title="Move left"
+                    ><ChevronLeft size={14} /></button>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="5"
+                      value={logoPositionX}
+                      onChange={(e) => setLogoPositionX(Number(e.target.value))}
+                      className="flex-1 accent-stone-900 h-1.5"
+                      aria-label="Logo horizontal position"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setLogoPositionX(Math.min(100, logoPositionX + 5))}
+                      className="flex-shrink-0 w-7 h-7 rounded-full border border-stone-200 bg-white text-stone-600 hover:bg-stone-100 flex items-center justify-center"
+                      title="Move right"
+                    ><ChevronRight size={14} /></button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <button
+                    type="button"
+                    onClick={resetLogoDisplay}
+                    className="text-[10px] font-bold uppercase tracking-widest text-stone-400 hover:text-stone-700 transition-colors"
+                  >
+                    Reset Display
+                  </button>
+                  <button
+                    type="button"
+                    onClick={updateRestaurantInfo}
+                    disabled={savingAction === "restaurant"}
+                    className="bg-stone-900 text-white text-xs font-bold px-4 py-1.5 rounded-full hover:bg-stone-800 disabled:opacity-60 transition-colors"
+                  >
+                    {savingAction === "restaurant" ? "Saving…" : "Save Logo"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 flex items-center">
+                <p className="text-xs text-stone-400 italic">Upload a logo to unlock size and position controls.</p>
+              </div>
+            )}
           </div>
         </section>
 
