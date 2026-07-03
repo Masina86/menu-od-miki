@@ -3140,6 +3140,8 @@ export default function AdminPanel() {
   const logoPreviewStyle: React.CSSProperties = {
     objectFit: logoFit,
     objectPosition: logoObjectPosition,
+    transform: `scale(${logoSize / 100})`,
+    transformOrigin: "center",
   };
   const logoInputValue = isDataImageUrl(logoUrl) ? "" : logoUrl;
   const backgroundInputValue = isDataImageUrl(backgroundUrl)
@@ -3365,29 +3367,27 @@ export default function AdminPanel() {
                                 ))}
                               </div>
                             </div>
-                            {logoFit === "cover" && (
-                              <div className="grid grid-cols-2 gap-2">
-                                {[
-                                  { label: "X", value: logoPositionX, set: setLogoPositionX, ariaLabel: "Logo horizontal crop position" },
-                                  { label: "Y", value: logoPositionY, set: setLogoPositionY, ariaLabel: "Logo vertical crop position" },
-                                ].map(({ label, value, set, ariaLabel }) => (
-                                  <div key={label} className="flex items-center gap-1.5">
-                                    <label className="text-[9px] font-bold uppercase text-stone-400 w-4 flex-shrink-0">{label}</label>
-                                    <input
-                                      type="range"
-                                      min="0"
-                                      max="100"
-                                      step="5"
-                                      value={value}
-                                      onChange={(e) => set(Number(e.target.value))}
-                                      className="flex-1 accent-stone-900"
-                                      aria-label={ariaLabel}
-                                    />
-                                    <span className="text-[9px] text-stone-500 w-6 text-right">{value}%</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
+                            <div className="grid grid-cols-2 gap-2">
+                              {[
+                                { label: "X", value: logoPositionX, set: setLogoPositionX, ariaLabel: "Logo horizontal crop position" },
+                                { label: "Y", value: logoPositionY, set: setLogoPositionY, ariaLabel: "Logo vertical crop position" },
+                              ].map(({ label, value, set, ariaLabel }) => (
+                                <div key={label} className="flex items-center gap-1.5">
+                                  <label className="text-[9px] font-bold uppercase text-stone-400 w-4 flex-shrink-0">{label}</label>
+                                  <input
+                                    type="range"
+                                    min="0"
+                                    max="100"
+                                    step="5"
+                                    value={value}
+                                    onChange={(e) => set(Number(e.target.value))}
+                                    className="flex-1 accent-stone-900"
+                                    aria-label={ariaLabel}
+                                  />
+                                  <span className="text-[9px] text-stone-500 w-6 text-right">{value}%</span>
+                                </div>
+                              ))}
+                            </div>
                             <button type="button" onClick={resetLogoDisplay} className="text-[9px] font-bold uppercase tracking-wide text-stone-400 hover:text-stone-900">
                               Reset display
                             </button>

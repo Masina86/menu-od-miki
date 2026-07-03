@@ -1088,7 +1088,7 @@ export default function MenuView() {
     width:
       logoFit === "cover"
         ? `min(${Math.round(360 * logoScale)}px, 82vw)`
-        : "auto",
+        : "100%",
     maxWidth: "82vw",
     objectFit: logoFit,
     objectPosition: logoObjectPosition,
@@ -1098,7 +1098,7 @@ export default function MenuView() {
     width:
       logoFit === "cover"
         ? `min(${Math.round(260 * logoScale)}px, 70vw)`
-        : "auto",
+        : "100%",
     maxWidth: "70vw",
     objectFit: logoFit,
     objectPosition: logoObjectPosition,
