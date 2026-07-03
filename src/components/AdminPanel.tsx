@@ -2802,13 +2802,7 @@ export default function AdminPanel() {
       DEFAULT_LOGO_POSITION,
     );
 
-    if (!trimmedRestaurantName) {
-      setAdminNotice({
-        type: "error",
-        message: "Restaurant name is required.",
-      });
-      return;
-    }
+
     const urlFields = [
       ["logo", trimmedLogoUrl],
       ["hero background", trimmedBackgroundUrl],
@@ -3152,8 +3146,10 @@ export default function AdminPanel() {
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
-                    className="text-3xl font-serif bg-white border border-stone-200 rounded-lg px-3 py-1 focus:outline-none focus:ring-2 focus:ring-stone-400"
+                    className="text-3xl font-serif bg-white border border-stone-200 rounded-lg px-3 py-1 focus:outline-none focus:ring-2 focus:ring-stone-400 min-w-[8ch]"
                     value={editRestaurantName}
+                    placeholder="Untitled Restaurant"
+                    size={Math.max(8, editRestaurantName.length + 1)}
                     onChange={(e) => setEditRestaurantName(e.target.value)}
                     autoFocus
                     onKeyDown={(e) => {
@@ -3542,7 +3538,11 @@ export default function AdminPanel() {
               </div>
             ) : (
               <div className="flex items-center gap-3 mb-2 group">
-                <h1 className="text-4xl font-serif">{restaurant.name}</h1>
+                <h1 className="text-4xl font-serif">
+                  {restaurant.name || (
+                    <span className="text-stone-300 italic">Untitled Restaurant</span>
+                  )}
+                </h1>
                 <button
                   onClick={() => setIsEditingRestaurant(true)}
                   className="opacity-0 group-hover:opacity-100 text-stone-400 hover:text-stone-900 transition-all p-1"
