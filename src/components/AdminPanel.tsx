@@ -3141,7 +3141,7 @@ export default function AdminPanel() {
     objectFit: logoFit,
     objectPosition: logoObjectPosition,
     transform: `scale(${logoSize / 100}) ${
-      logoFit === "contain" ? `translateY(${logoPositionY - 50}%)` : ""
+      logoFit === "contain" ? `translateY(${(logoPositionY - 50) * 4}%)` : ""
     }`,
     transformOrigin: "center",
   };

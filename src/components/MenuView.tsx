@@ -1096,7 +1096,7 @@ export default function MenuView() {
   } as React.CSSProperties;
   
   const heroLogoTransformStyle = {
-    transform: logoFit === "contain" ? `translateY(${logoPositionY - 50}%)` : "none",
+    transform: logoFit === "contain" ? `translateY(${(logoPositionY - 50) * 4}%)` : "none",
   };
   const footerLogoStyle: React.CSSProperties = {
     height: `${Math.round(112 * logoScale)}px`,
@@ -1107,7 +1107,7 @@ export default function MenuView() {
     maxWidth: "70vw",
     objectFit: logoFit,
     objectPosition: logoObjectPosition,
-    transform: logoFit === "contain" ? `translateY(${logoPositionY - 50}%)` : "none",
+    transform: logoFit === "contain" ? `translateY(${(logoPositionY - 50) * 4}%)` : "none",
   };
 
   const bg = darkMode
