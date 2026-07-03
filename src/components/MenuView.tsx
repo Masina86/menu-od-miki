@@ -1533,7 +1533,7 @@ export default function MenuView() {
 
         {/* ── Footer */}
         <footer
-          className={`border-t mt-8 ${darkMode ? "border-stone-800 bg-stone-900" : "border-stone-100 bg-[#f5f4ef]"}`}
+          className={`border-t mt-6 ${darkMode ? "border-stone-800 bg-stone-900" : "border-stone-100 bg-[#f5f4ef]"}`}
         >
           {/* Restaurant info block */}
           <div className="max-w-2xl mx-auto px-6 pt-10 pb-8 flex flex-col items-center gap-6">
@@ -1650,7 +1650,15 @@ export default function MenuView() {
             <p
               className={`text-[10px] uppercase tracking-widest pb-2 ${darkMode ? "text-stone-700" : "text-stone-400"}`}
             >
-              {t("powered", language)} MenuQR &bull; {new Date().getFullYear()}
+              {t("powered", language)}{" "}
+              {restaurant.footer_link ? (
+                <a href={restaurant.footer_link} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                  {restaurant.footer_text || "MenuQR"}
+                </a>
+              ) : (
+                restaurant.footer_text || "MenuQR"
+              )}
+              {" "}&bull; {new Date().getFullYear()}
             </p>
           </div>
         </footer>

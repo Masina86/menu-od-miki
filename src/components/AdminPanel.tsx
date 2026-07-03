@@ -2075,6 +2075,8 @@ export default function AdminPanel() {
   const [openingHours, setOpeningHours] = useState("");
   const [facebookUrl, setFacebookUrl] = useState("");
   const [instagramUrl, setInstagramUrl] = useState("");
+  const [footerText, setFooterText] = useState("");
+  const [footerLink, setFooterLink] = useState("");
   const [popularBadgesEnabled, setPopularBadgesEnabled] = useState(true);
   const [reviewsEnabled, setReviewsEnabled] = useState(true);
   const [takeoverEnabled, setTakeoverEnabled] = useState(false);
@@ -2261,6 +2263,8 @@ export default function AdminPanel() {
     setOpeningHours(rest.opening_hours || "");
     setFacebookUrl(rest.facebook_url || "");
     setInstagramUrl(rest.instagram_url || "");
+    setFooterText(rest.footer_text || "");
+    setFooterLink(rest.footer_link || "");
     setPopularBadgesEnabled(rest.popular_badges_enabled !== 0);
     setReviewsEnabled(rest.reviews_enabled !== 0);
     setTakeoverEnabled(rest.takeover_enabled !== 0);
@@ -2782,6 +2786,8 @@ export default function AdminPanel() {
     const trimmedOpeningHours = openingHours.trim();
     const trimmedFacebookUrl = facebookUrl.trim();
     const trimmedInstagramUrl = instagramUrl.trim();
+    const trimmedFooterText = footerText.trim();
+    const trimmedFooterLink = footerLink.trim();
     const normalizedLogoSize = clampNumber(
       logoSize,
       MIN_LOGO_SIZE,
@@ -2808,6 +2814,7 @@ export default function AdminPanel() {
       ["hero background", trimmedBackgroundUrl],
       ["Facebook", trimmedFacebookUrl],
       ["Instagram", trimmedInstagramUrl],
+      ["Footer link", trimmedFooterLink],
       ["Takeover image", takeoverImageUrl.trim()],
     ] as const;
     const invalidUrl = urlFields.find(
@@ -2838,6 +2845,8 @@ export default function AdminPanel() {
         opening_hours: trimmedOpeningHours,
         facebook_url: trimmedFacebookUrl,
         instagram_url: trimmedInstagramUrl,
+        footer_text: trimmedFooterText,
+        footer_link: trimmedFooterLink,
         takeover_enabled: takeoverEnabled ? 1 : 0,
         takeover_title: takeoverTitle.trim(),
         takeover_message: takeoverMessage.trim(),
@@ -2861,6 +2870,8 @@ export default function AdminPanel() {
         opening_hours: trimmedOpeningHours,
         facebook_url: trimmedFacebookUrl,
         instagram_url: trimmedInstagramUrl,
+        footer_text: trimmedFooterText,
+        footer_link: trimmedFooterLink,
         takeover_enabled: takeoverEnabled ? 1 : 0,
         takeover_title: takeoverTitle.trim(),
         takeover_message: takeoverMessage.trim(),
@@ -3244,6 +3255,34 @@ export default function AdminPanel() {
                       className="w-full bg-stone-50 border border-stone-200 rounded-lg px-2.5 py-1.5 text-xs focus:ring-1 focus:ring-stone-400 focus:outline-none"
                       value={instagramUrl}
                       onChange={(e) => setInstagramUrl(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Row 3.5: Footer Text and Link */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+                  <div className="space-y-0.5">
+                    <label className="text-[9px] text-stone-400 font-bold ml-0.5 uppercase tracking-widest flex items-center gap-1">
+                      Footer Text (e.g. MenuQR)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="MenuQR"
+                      className="w-full bg-stone-50 border border-stone-200 rounded-lg px-2.5 py-1.5 text-xs focus:ring-1 focus:ring-stone-400 focus:outline-none"
+                      value={footerText}
+                      onChange={(e) => setFooterText(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-0.5">
+                    <label className="text-[9px] text-stone-400 font-bold ml-0.5 uppercase tracking-widest flex items-center gap-1">
+                      Footer Link
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="https://menuqr.com"
+                      className="w-full bg-stone-50 border border-stone-200 rounded-lg px-2.5 py-1.5 text-xs focus:ring-1 focus:ring-stone-400 focus:outline-none"
+                      value={footerLink}
+                      onChange={(e) => setFooterLink(e.target.value)}
                     />
                   </div>
                 </div>
