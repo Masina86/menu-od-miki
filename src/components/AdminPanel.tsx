@@ -2085,6 +2085,7 @@ export default function AdminPanel() {
   const [takeoverPrice, setTakeoverPrice] = useState("");
   const [takeoverAllergens, setTakeoverAllergens] = useState("");
   const [takeoverImageUrl, setTakeoverImageUrl] = useState("");
+  const [isPromoExpanded, setIsPromoExpanded] = useState(false);
   const [popularCategoryStats, setPopularCategoryStats] =
     useState<PopularCategoryStats | null>(null);
   const [adminNotice, setAdminNotice] = useState<Notice | null>(null);
@@ -3647,95 +3648,125 @@ export default function AdminPanel() {
 
         {/* ── Special Promo Popup ─────────────────────────── */}
         <section className="mb-8 rounded-xl border border-stone-200 bg-white px-6 py-5">
-          <div className="flex items-center justify-between mb-4">
+          <div 
+            className="flex items-center justify-between mb-4 cursor-pointer select-none"
+            onClick={() => setIsPromoExpanded(!isPromoExpanded)}
+          >
             <div className="flex items-start gap-3">
               <div className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-orange-100 text-orange-600">
                 <Sparkles size={17} />
               </div>
               <div>
-                <p className="text-sm font-bold text-stone-900">Special Promo Popup</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-sm font-bold text-stone-900">Special Promo Popup</p>
+                  {isPromoExpanded ? (
+                    <ChevronUp size={15} className="text-stone-400" />
+                  ) : (
+                    <ChevronDown size={15} className="text-stone-400" />
+                  )}
+                </div>
                 <p className="mt-1 max-w-xl text-xs leading-relaxed text-stone-500">
                   Show a full-screen animated popup when a customer opens the menu. Appears only once per session. Ideal for daily specials, promotions, or announcements.
                 </p>
               </div>
             </div>
-            <label className="relative inline-flex items-center cursor-pointer ml-4 shrink-0">
-              <input
-                type="checkbox"
-                className="sr-only peer"
-                checked={takeoverEnabled}
-                onChange={(e) => setTakeoverEnabled(e.target.checked)}
-              />
-              <div className="w-11 h-6 bg-stone-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
-            </label>
+            <div onClick={(e) => e.stopPropagation()}>
+              <label className="relative inline-flex items-center cursor-pointer ml-4 shrink-0">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={takeoverEnabled}
+                  onChange={(e) => setTakeoverEnabled(e.target.checked)}
+                />
+                <div className="w-11 h-6 bg-stone-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+              </label>
+            </div>
           </div>
 
-          <div className="space-y-4 pt-4 border-t border-stone-100">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {isPromoExpanded && (
+            <div className="space-y-4 pt-4 border-t border-stone-100">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] text-stone-400 font-bold ml-1 uppercase tracking-widest">Headline</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Special of the day!"
+                    className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-stone-400 focus:bg-white transition-colors"
+                    value={takeoverTitle}
+                    onChange={(e) => setTakeoverTitle(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] text-stone-400 font-bold ml-1 uppercase tracking-widest">Price</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 500 MKD"
+                    className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-stone-400 focus:bg-white transition-colors"
+                    value={takeoverPrice}
+                    onChange={(e) => setTakeoverPrice(e.target.value)}
+                  />
+                </div>
+              </div>
+
               <div className="space-y-1">
-                <label className="text-[10px] text-stone-400 font-bold ml-1 uppercase tracking-widest">Headline</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Special of the day!"
-                  className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-stone-400 focus:bg-white transition-colors"
-                  value={takeoverTitle}
-                  onChange={(e) => setTakeoverTitle(e.target.value)}
+                <label className="text-[10px] text-stone-400 font-bold ml-1 uppercase tracking-widest">Description</label>
+                <textarea
+                  placeholder="Describe the special..."
+                  className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-stone-400 focus:bg-white transition-colors min-h-[80px]"
+                  value={takeoverMessage}
+                  onChange={(e) => setTakeoverMessage(e.target.value)}
                 />
               </div>
-              <div className="space-y-1">
-                <label className="text-[10px] text-stone-400 font-bold ml-1 uppercase tracking-widest">Price</label>
-                <input
-                  type="text"
-                  placeholder="e.g. 500 MKD"
-                  className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-stone-400 focus:bg-white transition-colors"
-                  value={takeoverPrice}
-                  onChange={(e) => setTakeoverPrice(e.target.value)}
+
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase tracking-widest text-stone-400 font-bold block">Allergens</label>
+                <AllergenPicker
+                  value={takeoverAllergens}
+                  onChange={setTakeoverAllergens}
                 />
               </div>
-            </div>
 
-            <div className="space-y-1">
-              <label className="text-[10px] text-stone-400 font-bold ml-1 uppercase tracking-widest">Description</label>
-              <textarea
-                placeholder="Describe the special..."
-                className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-stone-400 focus:bg-white transition-colors min-h-[80px]"
-                value={takeoverMessage}
-                onChange={(e) => setTakeoverMessage(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] uppercase tracking-widest text-stone-400 font-bold block">Allergens</label>
-              <AllergenPicker
-                value={takeoverAllergens}
-                onChange={setTakeoverAllergens}
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Promo Image</label>
-              <div className="flex items-center gap-4">
-                <div className="relative group bg-stone-50 rounded-xl border-2 border-dashed border-stone-200 w-36 h-24 flex items-center justify-center overflow-hidden">
-                  {takeoverImageUrl ? (
-                    <>
-                      <img src={takeoverImageUrl} alt="Promo" className="w-full h-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); setTakeoverImageUrl(""); }}
-                        className="absolute top-1 right-1 bg-white/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                        title="Remove image"
-                      >
-                        <X size={14} />
-                      </button>
-                      <label
-                        className="absolute bottom-0 inset-x-0 text-center text-[9px] font-semibold bg-black/40 text-white py-0.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                        title="Change image"
-                      >
-                        Change
+              <div className="flex flex-col gap-2">
+                <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Promo Image</label>
+                <div className="flex items-center gap-4">
+                  <div className="relative group bg-stone-50 rounded-xl border-2 border-dashed border-stone-200 w-36 h-24 flex items-center justify-center overflow-hidden">
+                    {takeoverImageUrl ? (
+                      <>
+                        <img src={takeoverImageUrl} alt="Promo" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setTakeoverImageUrl(""); }}
+                          className="absolute top-1 right-1 bg-white/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                          title="Remove image"
+                        >
+                          <X size={14} />
+                        </button>
+                        <label
+                          className="absolute bottom-0 inset-x-0 text-center text-[9px] font-semibold bg-black/40 text-white py-0.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                          title="Change image"
+                        >
+                          Change
+                          <input
+                            type="file"
+                            accept={ACCEPTED_IMAGE_FORMATS}
+                            className="opacity-0 absolute inset-0 cursor-pointer w-full h-full"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const reader = new FileReader();
+                              reader.onload = (ev) => setTakeoverImageUrl(ev.target?.result as string);
+                              reader.readAsDataURL(file);
+                            }}
+                          />
+                        </label>
+                      </>
+                    ) : (
+                      <>
+                        <ImageIcon className="text-stone-300" size={24} />
                         <input
                           type="file"
                           accept={ACCEPTED_IMAGE_FORMATS}
-                          className="opacity-0 absolute inset-0 cursor-pointer w-full h-full"
+                          className="absolute inset-0 opacity-0 cursor-pointer"
                           onChange={(e) => {
                             const file = e.target.files?.[0];
                             if (!file) return;
@@ -3744,41 +3775,25 @@ export default function AdminPanel() {
                             reader.readAsDataURL(file);
                           }}
                         />
-                      </label>
-                    </>
-                  ) : (
-                    <>
-                      <ImageIcon className="text-stone-300" size={24} />
-                      <input
-                        type="file"
-                        accept={ACCEPTED_IMAGE_FORMATS}
-                        className="absolute inset-0 opacity-0 cursor-pointer"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
-                          const reader = new FileReader();
-                          reader.onload = (ev) => setTakeoverImageUrl(ev.target?.result as string);
-                          reader.readAsDataURL(file);
-                        }}
-                      />
-                    </>
-                  )}
+                      </>
+                    )}
+                  </div>
+                  <p className="text-xs text-stone-500">Click to upload a promo image.<br />It will appear full-screen behind the popup text.</p>
                 </div>
-                <p className="text-xs text-stone-500">Click to upload a promo image.<br />It will appear full-screen behind the popup text.</p>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={saveTakeoverSettings}
+                  disabled={savingAction === "takeover"}
+                  className="bg-stone-900 text-white px-6 py-2 rounded-full text-sm font-bold hover:bg-stone-800 disabled:opacity-60 transition-colors"
+                >
+                  {savingAction === "takeover" ? "Saving..." : "Save Promo Settings"}
+                </button>
               </div>
             </div>
-
-            <div className="flex justify-end pt-2">
-              <button
-                type="button"
-                onClick={saveTakeoverSettings}
-                disabled={savingAction === "takeover"}
-                className="bg-stone-900 text-white px-6 py-2 rounded-full text-sm font-bold hover:bg-stone-800 disabled:opacity-60 transition-colors"
-              >
-                {savingAction === "takeover" ? "Saving..." : "Save Promo Settings"}
-              </button>
-            </div>
-          </div>
+          )}
         </section>
 
         <section className="space-y-8">

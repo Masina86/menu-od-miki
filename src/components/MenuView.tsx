@@ -917,12 +917,17 @@ export default function MenuView() {
       image.onerror = null;
     };
   }, [restaurant]);
-  // Persist dark mode
+
   useEffect(() => {
-    if (localStorage.getItem("menuDarkMode") === null) {
-      localStorage.setItem("menuDarkMode", "1");
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (darkMode) {
+      document.documentElement.classList.remove("light-mode");
+      if (meta) meta.setAttribute("content", "#1c1917");
+    } else {
+      document.documentElement.classList.add("light-mode");
+      if (meta) meta.setAttribute("content", "#fcfbf7");
     }
-  }, []);
+  }, [darkMode]);
 
   const toggleDark = () => {
     setDarkMode((d) => {

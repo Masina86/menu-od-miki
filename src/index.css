@@ -4,6 +4,19 @@
 html {
   scrollbar-gutter: stable;
   overflow-y: scroll;
+  background-color: #1c1917; /* Default background: dark stone-900 */
+  color: #f5f5f4;
+  transition: background-color 0.2s ease-in-out;
+}
+
+html.light-mode {
+  background-color: #fcfbf7; /* Light mode background */
+  color: #1c1917;
+}
+
+body {
+  background-color: inherit;
+  color: inherit;
 }
 
 /* Disable scroll anchoring to prevent tiny scroll jumps on content reflow (e.g. EN strings). */
