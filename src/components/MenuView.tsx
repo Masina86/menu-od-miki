@@ -1103,11 +1103,10 @@ export default function MenuView() {
     width:
       logoFit === "cover"
         ? `min(${Math.round(260 * logoScale)}px, 70vw)`
-        : "100%",
+        : "auto",
     maxWidth: "70vw",
     objectFit: logoFit,
-    objectPosition: logoObjectPosition,
-    transform: logoFit === "contain" ? `translateY(${(logoPositionY - 50) * 4}%)` : "none",
+    objectPosition: "center",
   };
 
   const bg = darkMode
