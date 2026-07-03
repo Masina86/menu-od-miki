@@ -3142,14 +3142,15 @@ export default function AdminPanel() {
         <header className="flex flex-col md:flex-row md:items-center justify-between mb-12 gap-4">
           <div>
             {isEditingRestaurant ? (
-              <div className="space-y-4 mb-2">
-                <div className="flex items-center gap-2">
+              <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm space-y-3 mb-2">
+                {/* Row 1: Name + actions */}
+                <div className="flex flex-wrap items-center gap-2">
                   <input
                     type="text"
-                    className="text-3xl font-serif bg-white border border-stone-200 rounded-lg px-3 py-1 focus:outline-none focus:ring-2 focus:ring-stone-400 min-w-[8ch]"
+                    className="text-2xl font-serif bg-stone-50 border border-stone-200 rounded-lg px-3 py-1 focus:outline-none focus:ring-2 focus:ring-stone-400 min-w-[8ch]"
                     value={editRestaurantName}
                     placeholder="Untitled Restaurant"
-                    size={Math.max(8, editRestaurantName.length + 1)}
+                    size={Math.max(8, editRestaurantName.length + 2)}
                     onChange={(e) => setEditRestaurantName(e.target.value)}
                     autoFocus
                     onKeyDown={(e) => {
@@ -3163,7 +3164,7 @@ export default function AdminPanel() {
                   <button
                     onClick={updateRestaurantInfo}
                     disabled={savingAction === "restaurant"}
-                    className="bg-stone-900 text-stone-50 px-4 py-2 rounded-lg hover:bg-stone-800 disabled:opacity-60 transition-colors"
+                    className="bg-stone-900 text-stone-50 px-4 py-1.5 rounded-lg text-sm hover:bg-stone-800 disabled:opacity-60 transition-colors"
                   >
                     {savingAction === "restaurant" ? "Saving..." : "Save"}
                   </button>
@@ -3172,97 +3173,60 @@ export default function AdminPanel() {
                       applyRestaurantToForm(restaurant);
                       setIsEditingRestaurant(false);
                     }}
-                    className="text-stone-400 hover:text-stone-600 p-2"
+                    className="text-stone-400 hover:text-stone-600 text-sm px-2 py-1.5"
                   >
                     Cancel
                   </button>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-stone-400 font-bold ml-1 uppercase">
-                      Phone
-                    </label>
-                    <input
-                      type="text"
-                      className="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-stone-400"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-stone-400 font-bold ml-1 uppercase">
-                      Address
-                    </label>
-                    <input
-                      type="text"
-                      className="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-stone-400"
-                      value={address}
-                      onChange={(e) => setAddress(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-stone-400 font-bold ml-1 uppercase">
-                      WiFi Password
-                    </label>
-                    <input
-                      type="text"
-                      className="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-stone-400"
-                      value={wifiPassword}
-                      onChange={(e) => setWifiPassword(e.target.value)}
-                    />
-                  </div>
+
+                {/* Divider */}
+                <div className="border-t border-stone-100" />
+
+                {/* Row 2: Phone / Address / WiFi / Opening Hours */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  {[
+                    { label: "Phone", value: phone, onChange: setPhone, placeholder: "+1 555 000 000" },
+                    { label: "Address", value: address, onChange: setAddress, placeholder: "123 Main St" },
+                    { label: "WiFi Password", value: wifiPassword, onChange: setWifiPassword, placeholder: "••••••••" },
+                    { label: "Opening Hours", value: openingHours, onChange: setOpeningHours, placeholder: "Mon–Fri 09–22, Sat–Sun 10–23" },
+                  ].map(({ label, value, onChange, placeholder }) => (
+                    <div key={label} className="space-y-0.5">
+                      <label className="text-[9px] text-stone-400 font-bold ml-0.5 uppercase tracking-widest block">
+                        {label}
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full bg-stone-50 border border-stone-200 rounded-lg px-2.5 py-1.5 text-xs focus:ring-1 focus:ring-stone-400 focus:outline-none"
+                        value={value}
+                        placeholder={placeholder}
+                        onChange={(e) => onChange(e.target.value)}
+                      />
+                    </div>
+                  ))}
                 </div>
-                <div className="grid grid-cols-1 gap-4 mt-2">
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-stone-400 font-bold ml-1 uppercase flex items-center gap-1">
-                      🕐 Opening Hours
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Mon–Fri 09:00–22:00, Sat–Sun 10:00–23:00"
-                      className="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-stone-400"
-                      value={openingHours}
-                      onChange={(e) => setOpeningHours(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-stone-400 font-bold ml-1 uppercase flex items-center gap-1">
-                      <svg
-                        viewBox="0 0 24 24"
-                        width="12"
-                        height="12"
-                        fill="#1877F2"
-                      >
+
+                {/* Row 3: Facebook / Instagram */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div className="space-y-0.5">
+                    <label className="text-[9px] text-stone-400 font-bold ml-0.5 uppercase tracking-widest flex items-center gap-1">
+                      <svg viewBox="0 0 24 24" width="10" height="10" fill="#1877F2">
                         <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
                       </svg>
-                      Facebook URL
+                      Facebook
                     </label>
                     <input
                       type="text"
                       placeholder="https://facebook.com/yourpage"
-                      className="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-stone-400"
+                      className="w-full bg-stone-50 border border-stone-200 rounded-lg px-2.5 py-1.5 text-xs focus:ring-1 focus:ring-stone-400 focus:outline-none"
                       value={facebookUrl}
                       onChange={(e) => setFacebookUrl(e.target.value)}
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-stone-400 font-bold ml-1 uppercase flex items-center gap-1">
-                      <svg
-                        viewBox="0 0 24 24"
-                        width="12"
-                        height="12"
-                        fill="url(#ig-grad)"
-                      >
+                  <div className="space-y-0.5">
+                    <label className="text-[9px] text-stone-400 font-bold ml-0.5 uppercase tracking-widest flex items-center gap-1">
+                      <svg viewBox="0 0 24 24" width="10" height="10" fill="url(#ig-grad2)">
                         <defs>
-                          <linearGradient
-                            id="ig-grad"
-                            x1="0%"
-                            y1="100%"
-                            x2="100%"
-                            y2="0%"
-                          >
+                          <linearGradient id="ig-grad2" x1="0%" y1="100%" x2="100%" y2="0%">
                             <stop offset="0%" stopColor="#f09433" />
                             <stop offset="25%" stopColor="#e6683c" />
                             <stop offset="50%" stopColor="#dc2743" />
@@ -3272,265 +3236,162 @@ export default function AdminPanel() {
                         </defs>
                         <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
                       </svg>
-                      Instagram URL
+                      Instagram
                     </label>
                     <input
                       type="text"
                       placeholder="https://instagram.com/yourpage"
-                      className="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-stone-400"
+                      className="w-full bg-stone-50 border border-stone-200 rounded-lg px-2.5 py-1.5 text-xs focus:ring-1 focus:ring-stone-400 focus:outline-none"
                       value={instagramUrl}
                       onChange={(e) => setInstagramUrl(e.target.value)}
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[10px] font-bold text-stone-400 uppercase">
-                      Logo
-                    </label>
-                    <div className="flex items-center gap-4">
-                      <div className="relative group bg-stone-100 rounded-xl border-2 border-dashed border-stone-200 w-32 h-20 flex items-center justify-center overflow-hidden">
+                {/* Divider */}
+                <div className="border-t border-stone-100" />
+
+                {/* Row 4: Logo + Hero Background side by side */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Logo */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[9px] font-bold text-stone-400 uppercase tracking-widest">Logo</label>
+                    <div className="flex items-start gap-3">
+                      <div className="relative group bg-stone-100 rounded-lg border-2 border-dashed border-stone-200 w-20 h-14 flex-shrink-0 flex items-center justify-center overflow-hidden">
                         {logoUrl ? (
                           <>
-                            <img
-                              src={logoUrl}
-                              alt="Logo Preview"
-                              className="w-full h-full"
-                              style={logoPreviewStyle}
-                            />
-                            {/* Delete button — no file input behind it */}
+                            <img src={logoUrl} alt="Logo Preview" className="w-full h-full" style={logoPreviewStyle} />
                             <button
                               type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                clearLogo();
-                              }}
-                              className="absolute top-1 right-1 bg-white/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                              onClick={(e) => { e.stopPropagation(); clearLogo(); }}
+                              className="absolute top-0.5 right-0.5 bg-white/80 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-10"
                               title="Remove logo"
                             >
-                              <X size={14} />
+                              <X size={11} />
                             </button>
-                            {/* Change-image label (bottom strip) */}
-                            <label
-                              className="absolute bottom-0 inset-x-0 text-center text-[9px] font-semibold bg-black/40 text-white py-0.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                              title="Change logo"
-                            >
+                            <label className="absolute bottom-0 inset-x-0 text-center text-[8px] font-semibold bg-black/40 text-white py-0.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                               Change
-                              <input
-                                type="file"
-                                accept={ACCEPTED_IMAGE_FORMATS}
-                                className="opacity-0 absolute inset-0 cursor-pointer w-full h-full"
-                                onChange={handleLogoUpload}
-                              />
+                              <input type="file" accept={ACCEPTED_IMAGE_FORMATS} className="opacity-0 absolute inset-0 cursor-pointer w-full h-full" onChange={handleLogoUpload} />
                             </label>
                           </>
                         ) : (
                           <>
-                            <ImageIcon className="text-stone-300" size={24} />
-                            {/* File input only covers the empty state area */}
-                            <input
-                              type="file"
-                              accept={ACCEPTED_IMAGE_FORMATS}
-                              className="absolute inset-0 opacity-0 cursor-pointer"
-                              onChange={handleLogoUpload}
-                            />
+                            <ImageIcon className="text-stone-300" size={18} />
+                            <input type="file" accept={ACCEPTED_IMAGE_FORMATS} className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleLogoUpload} />
                           </>
                         )}
                       </div>
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0 space-y-1.5">
                         <input
                           type="text"
-                          placeholder={
-                            isDataImageUrl(logoUrl)
-                              ? "Uploaded logo"
-                              : "Or enter image URL..."
-                          }
-                          className="w-full text-sm bg-white border border-stone-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-stone-400"
+                          placeholder={isDataImageUrl(logoUrl) ? "Uploaded logo" : "Or enter image URL..."}
+                          className="w-full text-xs bg-stone-50 border border-stone-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-stone-400"
                           value={logoInputValue}
                           onChange={(e) => {
                             setLogoUrl(e.target.value);
                             if (!e.target.value.trim()) resetLogoDisplay();
                           }}
                         />
-                        <p className="text-[10px] text-stone-400 mt-1 italic">
-                          Shown in the hero banner and footer.
-                        </p>
                         {logoUrl && (
-                          <div className="mt-3 rounded-lg border border-stone-200 bg-stone-50/70 p-3 space-y-3">
-                            <div className="space-y-1.5">
-                              <div className="flex items-center justify-between gap-3">
-                                <label className="text-[10px] font-bold uppercase text-stone-400">
-                                  Size
-                                </label>
-                                <span className="text-[10px] font-semibold text-stone-500">
-                                  {logoSize}%
-                                </span>
-                              </div>
+                          <div className="rounded-lg border border-stone-200 bg-stone-50/70 p-2 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <label className="text-[9px] font-bold uppercase text-stone-400 w-8 flex-shrink-0">Size</label>
                               <input
                                 type="range"
                                 min={MIN_LOGO_SIZE}
                                 max={MAX_LOGO_SIZE}
                                 step="5"
                                 value={logoSize}
-                                onChange={(e) =>
-                                  setLogoSize(Number(e.target.value))
-                                }
-                                className="w-full accent-stone-900"
+                                onChange={(e) => setLogoSize(Number(e.target.value))}
+                                className="flex-1 accent-stone-900"
                                 aria-label="Logo size"
                               />
+                              <span className="text-[9px] font-semibold text-stone-500 w-8 text-right">{logoSize}%</span>
                             </div>
-
-                            <div className="flex items-center justify-between gap-3">
-                              <span className="text-[10px] font-bold uppercase text-stone-400">
-                                Mode
-                              </span>
-                              <div className="inline-flex rounded-lg border border-stone-200 bg-white p-0.5">
+                            <div className="flex items-center gap-2">
+                              <label className="text-[9px] font-bold uppercase text-stone-400 w-8 flex-shrink-0">Mode</label>
+                              <div className="inline-flex rounded-md border border-stone-200 bg-white p-0.5 gap-0.5">
                                 {(["contain", "cover"] as const).map((fit) => (
                                   <button
                                     key={fit}
                                     type="button"
                                     onClick={() => setLogoFit(fit)}
-                                    className={`rounded-md px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide transition-colors ${
-                                      logoFit === fit
-                                        ? "bg-stone-900 text-white"
-                                        : "text-stone-500 hover:text-stone-900"
-                                    }`}
+                                    className={`rounded px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide transition-colors ${logoFit === fit ? "bg-stone-900 text-white" : "text-stone-500 hover:text-stone-900"}`}
                                   >
                                     {fit === "contain" ? "Fit" : "Crop"}
                                   </button>
                                 ))}
                               </div>
                             </div>
-
                             {logoFit === "cover" && (
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <div className="space-y-1.5">
-                                  <div className="flex items-center justify-between gap-3">
-                                    <label className="text-[10px] font-bold uppercase text-stone-400">
-                                      Crop X
-                                    </label>
-                                    <span className="text-[10px] font-semibold text-stone-500">
-                                      {logoPositionX}%
-                                    </span>
+                              <div className="grid grid-cols-2 gap-2">
+                                {[
+                                  { label: "X", value: logoPositionX, set: setLogoPositionX, ariaLabel: "Logo horizontal crop position" },
+                                  { label: "Y", value: logoPositionY, set: setLogoPositionY, ariaLabel: "Logo vertical crop position" },
+                                ].map(({ label, value, set, ariaLabel }) => (
+                                  <div key={label} className="flex items-center gap-1.5">
+                                    <label className="text-[9px] font-bold uppercase text-stone-400 w-4 flex-shrink-0">{label}</label>
+                                    <input
+                                      type="range"
+                                      min="0"
+                                      max="100"
+                                      step="5"
+                                      value={value}
+                                      onChange={(e) => set(Number(e.target.value))}
+                                      className="flex-1 accent-stone-900"
+                                      aria-label={ariaLabel}
+                                    />
+                                    <span className="text-[9px] text-stone-500 w-6 text-right">{value}%</span>
                                   </div>
-                                  <input
-                                    type="range"
-                                    min="0"
-                                    max="100"
-                                    step="5"
-                                    value={logoPositionX}
-                                    onChange={(e) =>
-                                      setLogoPositionX(Number(e.target.value))
-                                    }
-                                    className="w-full accent-stone-900"
-                                    aria-label="Logo horizontal crop position"
-                                  />
-                                </div>
-                                <div className="space-y-1.5">
-                                  <div className="flex items-center justify-between gap-3">
-                                    <label className="text-[10px] font-bold uppercase text-stone-400">
-                                      Crop Y
-                                    </label>
-                                    <span className="text-[10px] font-semibold text-stone-500">
-                                      {logoPositionY}%
-                                    </span>
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min="0"
-                                    max="100"
-                                    step="5"
-                                    value={logoPositionY}
-                                    onChange={(e) =>
-                                      setLogoPositionY(Number(e.target.value))
-                                    }
-                                    className="w-full accent-stone-900"
-                                    aria-label="Logo vertical crop position"
-                                  />
-                                </div>
+                                ))}
                               </div>
                             )}
-
-                            <button
-                              type="button"
-                              onClick={resetLogoDisplay}
-                              className="text-[10px] font-bold uppercase tracking-wide text-stone-400 hover:text-stone-900"
-                            >
-                              Reset logo display
+                            <button type="button" onClick={resetLogoDisplay} className="text-[9px] font-bold uppercase tracking-wide text-stone-400 hover:text-stone-900">
+                              Reset display
                             </button>
                           </div>
                         )}
                       </div>
                     </div>
                   </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[10px] font-bold text-stone-400 uppercase">
-                      Hero Background Image
-                    </label>
-                    <div className="flex items-center gap-4">
-                      <div className="relative group bg-stone-100 rounded-xl border-2 border-dashed border-stone-200 w-32 h-20 flex items-center justify-center overflow-hidden">
+
+                  {/* Hero Background */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[9px] font-bold text-stone-400 uppercase tracking-widest">Hero Background</label>
+                    <div className="flex items-start gap-3">
+                      <div className="relative group bg-stone-100 rounded-lg border-2 border-dashed border-stone-200 w-20 h-14 flex-shrink-0 flex items-center justify-center overflow-hidden">
                         {backgroundUrl ? (
                           <>
-                            <img
-                              src={backgroundUrl}
-                              alt="Background Preview"
-                              className="w-full h-full object-cover"
-                            />
-                            {/* Delete button — no file input behind it */}
+                            <img src={backgroundUrl} alt="Background Preview" className="w-full h-full object-cover" />
                             <button
                               type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setBackgroundUrl("");
-                              }}
-                              className="absolute top-1 right-1 bg-white/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                              onClick={(e) => { e.stopPropagation(); setBackgroundUrl(""); }}
+                              className="absolute top-0.5 right-0.5 bg-white/80 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-10"
                               title="Remove background"
                             >
-                              <X size={14} />
+                              <X size={11} />
                             </button>
-                            {/* Change-image label (bottom strip) */}
-                            <label
-                              className="absolute bottom-0 inset-x-0 text-center text-[9px] font-semibold bg-black/40 text-white py-0.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                              title="Change background"
-                            >
+                            <label className="absolute bottom-0 inset-x-0 text-center text-[8px] font-semibold bg-black/40 text-white py-0.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                               Change
-                              <input
-                                type="file"
-                                accept={ACCEPTED_IMAGE_FORMATS}
-                                className="opacity-0 absolute inset-0 cursor-pointer w-full h-full"
-                                onChange={handleBackgroundUpload}
-                              />
+                              <input type="file" accept={ACCEPTED_IMAGE_FORMATS} className="opacity-0 absolute inset-0 cursor-pointer w-full h-full" onChange={handleBackgroundUpload} />
                             </label>
                           </>
                         ) : (
                           <>
-                            <ImageIcon className="text-stone-300" size={24} />
-                            {/* File input only covers the empty state area */}
-                            <input
-                              type="file"
-                              accept={ACCEPTED_IMAGE_FORMATS}
-                              className="absolute inset-0 opacity-0 cursor-pointer"
-                              onChange={handleBackgroundUpload}
-                            />
+                            <ImageIcon className="text-stone-300" size={18} />
+                            <input type="file" accept={ACCEPTED_IMAGE_FORMATS} className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleBackgroundUpload} />
                           </>
                         )}
                       </div>
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <input
                           type="text"
-                          placeholder={
-                            isDataImageUrl(backgroundUrl)
-                              ? "Uploaded hero image"
-                              : "Or enter image URL..."
-                          }
-                          className="w-full text-sm bg-white border border-stone-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-stone-400"
+                          placeholder={isDataImageUrl(backgroundUrl) ? "Uploaded hero image" : "Or enter image URL..."}
+                          className="w-full text-xs bg-stone-50 border border-stone-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-stone-400"
                           value={backgroundInputValue}
                           onChange={(e) => setBackgroundUrl(e.target.value)}
                         />
-                        <p className="text-[10px] text-stone-400 mt-1 italic">
-                          Shown only in the hero banner at the top of the menu.
-                        </p>
+                        <p className="text-[9px] text-stone-400 mt-1 italic">Shown in the hero banner at the top of the menu.</p>
                       </div>
                     </div>
                   </div>
