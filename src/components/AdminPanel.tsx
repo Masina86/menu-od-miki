@@ -3140,7 +3140,9 @@ export default function AdminPanel() {
   const logoPreviewStyle: React.CSSProperties = {
     objectFit: logoFit,
     objectPosition: logoObjectPosition,
-    transform: `scale(${logoSize / 100})`,
+    transform: `scale(${logoSize / 100}) ${
+      logoFit === "contain" ? `translateY(${logoPositionY - 50}%)` : ""
+    }`,
     transformOrigin: "center",
   };
   const logoInputValue = isDataImageUrl(logoUrl) ? "" : logoUrl;

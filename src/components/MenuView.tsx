@@ -1064,17 +1064,18 @@ export default function MenuView() {
   );
   const logoScale = logoSize / 100;
   const logoFit = normalizeLogoFit(restaurant.logo_fit);
+  const logoPositionY = clampNumber(
+    restaurant.logo_position_y,
+    0,
+    100,
+    DEFAULT_LOGO_POSITION,
+  );
   const logoObjectPosition = `${clampNumber(
     restaurant.logo_position_x,
     0,
     100,
     DEFAULT_LOGO_POSITION,
-  )}% ${clampNumber(
-    restaurant.logo_position_y,
-    0,
-    100,
-    DEFAULT_LOGO_POSITION,
-  )}%`;
+  )}% ${logoPositionY}%`;
   const heroLogoStyle = {
     "--hero-logo-mobile-height": `clamp(${Math.round(
       94 * logoScale,
@@ -1092,6 +1093,7 @@ export default function MenuView() {
     maxWidth: "82vw",
     objectFit: logoFit,
     objectPosition: logoObjectPosition,
+    transform: logoFit === "contain" ? `translateY(${logoPositionY - 50}%)` : "none",
   } as React.CSSProperties;
   const footerLogoStyle: React.CSSProperties = {
     height: `${Math.round(112 * logoScale)}px`,
@@ -1102,6 +1104,7 @@ export default function MenuView() {
     maxWidth: "70vw",
     objectFit: logoFit,
     objectPosition: logoObjectPosition,
+    transform: logoFit === "contain" ? `translateY(${logoPositionY - 50}%)` : "none",
   };
 
   const bg = darkMode
