@@ -198,6 +198,15 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_category_view_events_period
     ON category_view_events (restaurant_id, period_key, category_id);
+
+  CREATE TABLE IF NOT EXISTS menu_scans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    restaurant_id INTEGER NOT NULL,
+    month_key TEXT NOT NULL,
+    scan_count INTEGER DEFAULT 1,
+    FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE,
+    UNIQUE (restaurant_id, month_key)
+  );
 `);
 
 async function startServer() {
@@ -272,6 +281,11 @@ async function startServer() {
   const formatPeriodKey = (date: Date) => {
     const { year, month, day } = localDateTimeParts(date);
     return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  };
+
+  const formatMonthKey = (date: Date) => {
+    const { year, month } = localDateTimeParts(date);
+    return `${year}-${String(month).padStart(2, "0")}`;
   };
 
   const getCurrentPeriodKey = (date = new Date()) => {
@@ -1046,6 +1060,15 @@ async function startServer() {
     const { slug } = req.params;
     const restaurant = getOrCreateRestaurantBySlug(slug);
 
+    // Fetch current month's scans
+    try {
+      const scanRow = db.prepare("SELECT scan_count FROM menu_scans WHERE restaurant_id = ? AND month_key = ?").get(restaurant.id, formatMonthKey(new Date())) as any;
+      restaurant.current_month_scans = scanRow ? scanRow.scan_count : 0;
+    } catch(e) {
+      console.error("Error fetching scan count", e);
+      restaurant.current_month_scans = 0;
+    }
+
     res.json(toJSON(restaurant));
   });
 
@@ -1139,6 +1162,18 @@ async function startServer() {
     const restaurant = refreshPopularCategory(
       getOrCreateRestaurantBySlug(req.params.slug),
     );
+
+    // Track scan for the current month
+    try {
+      db.prepare(
+        `INSERT INTO menu_scans (restaurant_id, month_key, scan_count) 
+         VALUES (?, ?, 1) 
+         ON CONFLICT(restaurant_id, month_key) DO UPDATE SET scan_count = scan_count + 1`,
+      ).run(restaurant.id, formatMonthKey(new Date()));
+    } catch (e) {
+      console.error("[api] Error tracking scan:", e);
+    }
+
     const publicRestaurant = {
       ...restaurant,
       background_url: compactImageUrl(

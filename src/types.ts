@@ -68,6 +68,7 @@ export interface Restaurant {
   takeover_price?: string;
   takeover_allergens?: string; // comma-separated: "gluten,dairy"
   takeover_image_url?: string;
+  current_month_scans?: number;
 }
 
 export type Language = "MK" | "BG" | "EN";

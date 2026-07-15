@@ -3605,6 +3605,19 @@ export default function AdminPanel() {
           )}
         </AnimatePresence>
 
+        {/* Scans Counter Top */}
+        <section className="mb-6 bg-white rounded-3xl border border-stone-200 p-6 flex items-center justify-between shadow-sm">
+          <div>
+            <h2 className="text-lg font-serif text-stone-900">Monthly Menu Scans</h2>
+            <p className="text-sm text-stone-500">
+              Number of times your menu was scanned or viewed this month. Resets on the 1st of every month.
+            </p>
+          </div>
+          <div className="bg-stone-100 rounded-xl px-4 py-2 flex items-center justify-center min-w-[80px]">
+            <span className="text-2xl font-bold font-mono text-stone-900">{restaurant?.current_month_scans || 0}</span>
+          </div>
+        </section>
+
         <section className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-8">
           <div className="bg-white border border-stone-200 rounded-xl px-4 py-3">
             <p className="text-[10px] uppercase tracking-widest text-stone-400 font-bold">
