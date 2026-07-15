@@ -142,6 +142,8 @@ tryAlter("ALTER TABLE restaurants ADD COLUMN takeover_message TEXT");
 tryAlter("ALTER TABLE restaurants ADD COLUMN takeover_price TEXT");
 tryAlter("ALTER TABLE restaurants ADD COLUMN takeover_allergens TEXT");
 tryAlter("ALTER TABLE restaurants ADD COLUMN takeover_image_url TEXT");
+tryAlter("ALTER TABLE restaurants ADD COLUMN footer_text TEXT");
+tryAlter("ALTER TABLE restaurants ADD COLUMN footer_link TEXT");
 
 tryAlter(
   "ALTER TABLE categories ADD COLUMN parent_id INTEGER REFERENCES categories(id) ON DELETE CASCADE",
@@ -1117,6 +1119,8 @@ async function startServer() {
         takeover_price,
         takeover_allergens,
         takeover_image_url,
+        footer_text,
+        footer_link,
       } = req.body;
       const id = Number(req.params.id);
 
@@ -1124,7 +1128,7 @@ async function startServer() {
 
       const result = db
         .prepare(
-          "UPDATE restaurants SET name = ?, background_url = ?, logo_url = ?, logo_size = ?, logo_fit = ?, logo_position_x = ?, logo_position_y = ?, phone = ?, address = ?, wifi_password = ?, opening_hours = ?, facebook_url = ?, instagram_url = ?, takeover_enabled = ?, takeover_title = ?, takeover_message = ?, takeover_price = ?, takeover_allergens = ?, takeover_image_url = ? WHERE id = ?",
+          "UPDATE restaurants SET name = ?, background_url = ?, logo_url = ?, logo_size = ?, logo_fit = ?, logo_position_x = ?, logo_position_y = ?, phone = ?, address = ?, wifi_password = ?, opening_hours = ?, facebook_url = ?, instagram_url = ?, takeover_enabled = ?, takeover_title = ?, takeover_message = ?, takeover_price = ?, takeover_allergens = ?, takeover_image_url = ?, footer_text = ?, footer_link = ? WHERE id = ?",
         )
         .run(
           String(name ?? "").trim(),
@@ -1146,6 +1150,8 @@ async function startServer() {
           optionalText(takeover_price),
           optionalText(takeover_allergens),
           optionalText(takeover_image_url),
+          optionalText(footer_text),
+          optionalText(footer_link),
           id,
         );
 

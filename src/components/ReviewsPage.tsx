@@ -162,8 +162,18 @@ export default function ReviewsPage() {
   } | null>(null);
   const [showForm, setShowForm] = useState(!viewOnly);
 
-  // Deletion state
   const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  useEffect(() => {
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (darkMode) {
+      document.documentElement.classList.remove("light-mode");
+      if (meta) meta.setAttribute("content", "#1c1917");
+    } else {
+      document.documentElement.classList.add("light-mode");
+      if (meta) meta.setAttribute("content", "#fcfbf7");
+    }
+  }, [darkMode]);
 
   const toggleDark = () => {
     setDarkMode((d) => {
