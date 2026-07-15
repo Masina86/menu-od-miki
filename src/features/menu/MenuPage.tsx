@@ -16,6 +16,9 @@ import {
   type LogoFit,
 } from "../../../shared/types";
 import { ImageModal } from "../../components/media/ImageModal";
+import { MenuSearch } from "./components/MenuSearch";
+import { useMenuData } from "./hooks/useMenuData";
+import { useMenuSearch } from "./hooks/useMenuSearch";
 import { AllergenBadge } from "../../components/allergens/AllergenIcons";
 import {
   getAllergenList,
@@ -714,7 +717,7 @@ const CategoryNav: React.FC<CategoryNavProps> = ({
               msOverflowStyle: "none",
               // Keep layout stable when pills overflow in EN.
               scrollbarGutter: "stable",
-            } as any
+            } as React.CSSProperties
           }
         >
           {categories.map((cat) => {
@@ -781,12 +784,16 @@ const heroLogoVariants = {
 
 export default function MenuPage() {
   const { slug } = useParams<{ slug: string }>();
-  const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
-  const [menu, setMenu] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
+  const { restaurant, menu, loading, loadError, reload: fetchData } = useMenuData(slug);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [language, setLanguage] = useState<Language>("MK");
+  const {
+    searchQuery,
+    setSearchQuery,
+    searchInputRef,
+    normalizedSearchQuery,
+    hasSearchResults,
+  } = useMenuSearch(menu, language);
   const [darkMode, setDarkMode] = useState(() => {
     try {
       return localStorage.getItem("menuDarkMode") !== "0";
@@ -866,53 +873,26 @@ export default function MenuPage() {
     setIsTakeoverReady(false);
   }, []);
 
-  // Scroll detection
+  // Scroll detection is throttled to one state update per animation frame.
   useEffect(() => {
-    const onScroll = () => {
+    let frame: number | null = null;
+    const update = () => {
+      frame = null;
       const atTop = window.scrollY <= 12;
       setShowBackToTop(window.scrollY > 350);
       setIsAtTop(atTop);
-      if (!atTop) {
-        setShowWifi(false);
-      }
+      if (!atTop) setShowWifi(false);
+    };
+    const onScroll = () => {
+      if (frame === null) frame = window.requestAnimationFrame(update);
     };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (frame !== null) window.cancelAnimationFrame(frame);
+    };
   }, []);
-
-  const fetchData = useCallback(async () => {
-    if (!slug) return;
-    setLoading(true);
-    setLoadError("");
-    try {
-      const source = new URLSearchParams(window.location.search).get("source");
-      const sourceQuery = source === "qr" ? "?source=qr" : "";
-      const res = await fetch("/api/public-menu/" + slug + sourceQuery, {
-        cache: "no-store",
-      });
-      if (!res.ok) throw new Error(`Failed to load menu (${res.status})`);
-      const data = await res.json();
-      setRestaurant(data.restaurant);
-      setMenu(data.menu || []);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-      setRestaurant(null);
-      setMenu([]);
-      setLoadError(
-        error instanceof Error
-          ? error.message
-          : "Could not load this menu. Please try again.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [slug]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
   const availableLanguages = useMemo<Language[]>(() => {
     const languages: Language[] = ["MK"];
     if (hasMenuContentForLanguage(menu, "BG")) languages.push("BG");
@@ -926,22 +906,28 @@ export default function MenuPage() {
     }
   }, [availableLanguages, language]);
 
+  // Defer the optional admin affordance so it never competes with the menu's
+  // first render or public-menu request.
   useEffect(() => {
+    const controller = new AbortController();
     const checkAdminSession = async () => {
       try {
-        const res = await fetch("/api/auth/session");
-        if (!res.ok) return;
-        const data = await res.json();
-        setIsAdminAuthenticated(!!data.authenticated);
-      } catch (error) {
-        console.error("Error checking admin session:", error);
+        const res = await fetch("/api/auth/session", { signal: controller.signal });
+        if (!res.ok || controller.signal.aborted) return;
+        const data = (await res.json()) as { authenticated?: boolean };
+        setIsAdminAuthenticated(Boolean(data.authenticated));
+      } catch (error: unknown) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          console.error("Error checking admin session:", error);
+        }
       }
     };
-
-    checkAdminSession();
+    const timer = window.setTimeout(checkAdminSession, 1500);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
   }, []);
-
-  // ── Loading state
   if (loading) return <MenuSkeleton darkMode={darkMode} />;
 
   if (loadError)
@@ -954,7 +940,7 @@ export default function MenuPage() {
         <p className="max-w-sm text-stone-500 mb-6">{loadError}</p>
         <button
           type="button"
-          onClick={fetchData}
+          onClick={() => void fetchData()}
           className="rounded-xl bg-stone-900 px-5 py-3 text-sm font-bold uppercase tracking-widest text-stone-50 hover:bg-stone-800"
         >
           Try Again
@@ -1035,11 +1021,6 @@ export default function MenuPage() {
   const bg = darkMode
     ? "bg-stone-900 text-stone-100"
     : "bg-[#fcfbf7] text-stone-900";
-  const searchQuery = "";
-  const setSearchQuery = (_value: string) => {};
-  const searchInputRef = { current: null } as React.RefObject<HTMLInputElement>;
-  const normalizedSearchQuery = "";
-  const hasSearchResults = true;
   const trackCategoryView = (category: Category) => {
     if (!restaurant || restaurant.popular_badges_enabled === 0) return;
     fetch("/api/popularity/category-view", {
@@ -1168,8 +1149,16 @@ export default function MenuPage() {
           )}
         </div>
 
-        {/* ── Search Bar (expandable) */}
-        {/* ── WiFi Popup */}
+        {restaurant.search_enabled !== 0 && (
+          <MenuSearch
+            query={searchQuery}
+            placeholder={t("search_placeholder", language)}
+            darkMode={darkMode}
+            inputRef={searchInputRef}
+            onChange={setSearchQuery}
+            onClear={() => setSearchQuery("")}
+          />
+        )}        {/* ── WiFi Popup */}
         <AnimatePresence>
           {showWifi && hasWifi && (
             <motion.div

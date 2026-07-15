@@ -46,11 +46,15 @@ class AdminErrorBoundary extends Component<
               Admin page could not load
             </h1>
             <p className="mb-4 text-sm text-stone-600">
-              The page hit a display error instead of staying white.
+              Please refresh the page and try again. If the problem continues, contact support.
             </p>
-            <pre className="overflow-auto rounded bg-stone-100 p-3 text-xs text-stone-800">
-              {this.state.error.message}
-            </pre>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-800"
+            >
+              Refresh
+            </button>
           </div>
         </div>
       );

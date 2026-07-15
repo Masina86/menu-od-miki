@@ -10,14 +10,14 @@ export function buildMenu(
 ): Category[] {
   const allCategories = db
     .prepare(
-      "SELECT * FROM categories WHERE restaurant_id = ? ORDER BY sort_order, id",
+      "SELECT id, restaurant_id, parent_id, name, name_en, name_bg, image_url, sort_order FROM categories WHERE restaurant_id = ? ORDER BY sort_order, id",
     )
     .all(restaurantId) as Array<Record<string, unknown>>;
   const categoryIds = allCategories.map((category) => category.id);
   const products = categoryIds.length
     ? (db
         .prepare(
-          "SELECT * FROM products WHERE category_id IN (" +
+          "SELECT id, category_id, name, name_en, name_bg, price, description, description_en, description_bg, image_url, sort_order, is_available, tags, allergens, calories, is_featured, is_new FROM products WHERE category_id IN (" +
             categoryIds.map(() => "?").join(",") +
             ") ORDER BY category_id, sort_order, id",
         )
@@ -27,7 +27,7 @@ export function buildMenu(
   const additions = productIds.length
     ? (db
         .prepare(
-          "SELECT * FROM additions WHERE product_id IN (" +
+          "SELECT id, product_id, name, name_en, name_bg, price FROM additions WHERE product_id IN (" +
             productIds.map(() => "?").join(",") +
             ") ORDER BY product_id, id",
         )

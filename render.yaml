@@ -5,7 +5,7 @@ services:
     plan: starter
     buildCommand: npm ci && npm run build
     startCommand: node dist-server/server.js
-    healthCheckPath: /
+    healthCheckPath: /healthz
     envVars:
       - key: NODE_ENV
         value: production

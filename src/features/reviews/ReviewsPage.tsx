@@ -281,8 +281,8 @@ export default function ReviewsPage() {
       setComment("");
       setSubmitStatus({ type: "success", message: "Thank you for your review! 🎉" });
       setShowForm(false);
-    } catch (err: any) {
-      setSubmitStatus({ type: "error", message: err.message || "Could not submit review." });
+    } catch (err: unknown) {
+      setSubmitStatus({ type: "error", message: err instanceof Error ? err.message : "Could not submit review." });
     } finally {
       setSubmitting(false);
     }

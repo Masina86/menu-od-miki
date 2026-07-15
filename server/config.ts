@@ -20,10 +20,14 @@ export function resolveDbPath(value = process.env.DB_PATH): string {
 export function loadConfig(env = process.env): AppConfig {
   const isProduction = env.NODE_ENV === "production";
   const adminPassword = env.ADMIN_PASSWORD || (isProduction ? "" : "admin");
+  const configuredPort = Number(env.PORT || 3000);
 
   return {
     dbPath: resolveDbPath(env.DB_PATH),
-    port: Number(env.PORT || 3000),
+    port:
+      Number.isInteger(configuredPort) && configuredPort > 0
+        ? configuredPort
+        : 3000,
     isProduction,
     adminPassword,
     adminSessionSecret:

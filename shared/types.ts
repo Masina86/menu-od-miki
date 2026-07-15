@@ -62,29 +62,30 @@ export interface Restaurant {
   id: number;
   name: string;
   slug: string;
-  background_url?: string;
-  logo_url?: string;
+  background_url?: string | null;
+  logo_url?: string | null;
   logo_size?: number;
   logo_fit?: LogoFit;
   logo_position_x?: number;
   logo_position_y?: number;
-  phone?: string;
-  address?: string;
-  wifi_password?: string;
-  opening_hours?: string;
-  facebook_url?: string;
-  instagram_url?: string;
+  phone?: string | null;
+  address?: string | null;
+  wifi_password?: string | null;
+  opening_hours?: string | null;
+  facebook_url?: string | null;
+  instagram_url?: string | null;
   popular_badges_enabled?: number;
   reviews_enabled?: number;
+  search_enabled?: number;
   takeover_enabled?: number;
-  takeover_title?: string;
-  takeover_message?: string;
-  takeover_price?: string;
-  takeover_allergens?: string;
-  takeover_image_url?: string;
+  takeover_title?: string | null;
+  takeover_message?: string | null;
+  takeover_price?: string | null;
+  takeover_allergens?: string | null;
+  takeover_image_url?: string | null;
   current_month_scans?: number;
-  footer_text?: string;
-  footer_link?: string;
+  footer_text?: string | null;
+  footer_link?: string | null;
 }
 
 export interface Review {
@@ -228,26 +229,26 @@ export interface ProductDraft {
 
 export interface RestaurantUpdatePayload {
   name: string;
-  background_url?: string;
-  logo_url?: string;
+  background_url?: string | null;
+  logo_url?: string | null;
   logo_size?: number;
   logo_fit?: LogoFit;
   logo_position_x?: number;
   logo_position_y?: number;
-  phone?: string;
-  address?: string;
-  wifi_password?: string;
-  opening_hours?: string;
-  facebook_url?: string;
-  instagram_url?: string;
+  phone?: string | null;
+  address?: string | null;
+  wifi_password?: string | null;
+  opening_hours?: string | null;
+  facebook_url?: string | null;
+  instagram_url?: string | null;
   takeover_enabled?: number;
-  takeover_title?: string;
-  takeover_message?: string;
-  takeover_price?: string;
-  takeover_allergens?: string;
-  takeover_image_url?: string;
-  footer_text?: string;
-  footer_link?: string;
+  takeover_title?: string | null;
+  takeover_message?: string | null;
+  takeover_price?: string | null;
+  takeover_allergens?: string | null;
+  takeover_image_url?: string | null;
+  footer_text?: string | null;
+  footer_link?: string | null;
 }
 
 export interface PopularCategoryStats {

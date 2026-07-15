@@ -17,6 +17,11 @@ export default defineConfig(({mode}) => {
     },
     server: {
       hmr: true,
+      watch: {
+        // SQLite creates WAL/SHM sidecar files during normal requests. They
+        // must not trigger a full-page reload in development.
+        ignored: ['**/*.db', '**/*.db-*'],
+      },
     },
   };
 });

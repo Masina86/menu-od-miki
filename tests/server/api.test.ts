@@ -38,6 +38,20 @@ describe("HTTP API compatibility", () => {
     const response = await request(app).get("/api/public-menu/test-restaurant");
     expect(response.status).toBe(200);
     expect(response.body.menu).toEqual([]);
+    expect(response.headers["cache-control"]).toBe(
+      "public, max-age=60, stale-while-revalidate=300",
+    );
+    const etag = response.headers.etag;
+    expect(etag).toMatch(/^".+"$/);
+
+    const notModified = await request(app)
+      .get("/api/public-menu/test-restaurant")
+      .set("If-None-Match", etag);
+    expect(notModified.status).toBe(304);
+
+    const health = await request(app).get("/healthz");
+    expect(health.status).toBe(200);
+    expect(health.body).toEqual({ status: "ok", database: "ok" });
   });
 
   it("protects admin mutations and supports session login", async () => {
@@ -57,5 +71,23 @@ describe("HTTP API compatibility", () => {
       .get("/api/auth/session")
       .set("Cookie", cookie);
     expect(session.body.authenticated).toBe(true);
+    const menuBeforeSetting = await request(app).get("/api/public-menu/test-restaurant");
+    const restaurantId = menuBeforeSetting.body.restaurant.id as number;
+    const disabledSearch = await request(app)
+      .put(`/api/restaurant/${restaurantId}/search-enabled`)
+      .set("Cookie", cookie)
+      .send({ enabled: false });
+    expect(disabledSearch.status).toBe(200);
+    expect(disabledSearch.body).toEqual({ success: true, enabled: false });
+
+    const disabledMenu = await request(app).get("/api/public-menu/test-restaurant");
+    expect(disabledMenu.body.restaurant.search_enabled).toBe(0);
+
+    const enabledSearch = await request(app)
+      .put(`/api/restaurant/${restaurantId}/search-enabled`)
+      .set("Cookie", cookie)
+      .send({ enabled: true });
+    expect(enabledSearch.status).toBe(200);
+    expect(enabledSearch.body).toEqual({ success: true, enabled: true });
   });
 });

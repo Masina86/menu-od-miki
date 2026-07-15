@@ -20,9 +20,10 @@ describe("legacy database migrations", () => {
       expect.arrayContaining([
         expect.objectContaining({ name: "footer_link" }),
         expect.objectContaining({ name: "reviews_enabled" }),
+        expect.objectContaining({ name: "search_enabled" }),
       ]),
     );
-    expect(Number((db.pragma("user_version") as Array<{ user_version: number }>)[0].user_version)).toBe(3);
+    expect(Number((db.pragma("user_version") as Array<{ user_version: number }>)[0].user_version)).toBe(4);
     db.close();
   });
 

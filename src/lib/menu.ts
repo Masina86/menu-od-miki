@@ -76,6 +76,7 @@ export function productMatchesSearch(
     getLanguageValue(product, "name", language),
     getLanguageValue(product, "description", language),
     ...parseCommaList(product.tags),
+    ...parseCommaList(product.allergens),
   ].some((value) => value.toLocaleLowerCase().includes(normalized));
 }
 

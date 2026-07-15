@@ -49,7 +49,7 @@ describe("scan statistics storage and service", () => {
         )
         .get(),
     ).toEqual({ name: "menu_scan_days" });
-    expect(Number((db.pragma("user_version") as Array<{ user_version: number }>)[0].user_version)).toBe(3);
+    expect(Number((db.pragma("user_version") as Array<{ user_version: number }>)[0].user_version)).toBe(4);
     db.close();
   });
 

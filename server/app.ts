@@ -3,10 +3,16 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
-import crypto from "crypto";
 import type Database from "better-sqlite3";
+import type { Addition, ProductDraft, Restaurant, Product } from "../shared/types.js";
 
 import { openDatabase } from "./db/connection.js";
+import { loadConfig } from "./config.js";
+import { PublicMenuCache } from "./domains/menu/cache.js";
+import { apiErrorHandler } from "./http/asyncRoute.js";
+import { registerAuthRoutes } from "./routes/auth.js";
+import { registerHealthRoute } from "./routes/health.js";
+import { registerPublicMenuRoute } from "./routes/publicMenu.js";
 import { buildMenu } from "./domains/menu/service.js";
 import {
   formatMonthKey,
@@ -19,12 +25,12 @@ import {
   clearAdminCookie,
   type AdminSessionConfig,
 } from "./domains/auth/session.js";
-import { compactImageUrl } from "./domains/images/dataUrl.js";
 import { createPopularityService } from "./domains/popularity/service.js";
 import { createScanStatisticsService } from "./domains/popularity/scanStats.js";
 import { toJSON } from "./http/json.js";
 import { HttpError, errorMessage } from "./http/errors.js";
 import type { ScanStatisticsExportScope } from "../shared/types.js";
+import type { RestaurantDbRow } from "./domains/restaurants/types.js";
 import {
   dataUrlToResponse,
   resolveImageBuffer,
@@ -36,6 +42,15 @@ dotenv.config();
 
 // Database setup is performed by the explicit migration runner in server.ts.
 const openDatabases = new Set<Database.Database>();
+type ImageRow = { image_url?: string | null };
+type ReviewSettingsRow = { id: number; reviews_enabled: number };
+type CategoryDbRow = {
+  id: number;
+  name: string;
+  name_en?: string | null;
+  name_bg?: string | null;
+  image_url?: string | null;
+};
 
 export function closeDatabaseForTests() {
   for (const database of openDatabases) {
@@ -45,32 +60,28 @@ export function closeDatabaseForTests() {
 }
 export async function startServer(options: { listen?: boolean } = {}) {
   const app = express();
-  const db = openDatabase();
+  const config = loadConfig();
+  const db = openDatabase(config.dbPath);
   openDatabases.add(db);
-  const PORT = Number(process.env.PORT || 3000);
+  const PORT = config.port;
 
-  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+  const GEMINI_API_KEY = config.geminiApiKey;
   const ai = GEMINI_API_KEY
     ? new GoogleGenAI({ apiKey: GEMINI_API_KEY })
     : null;
   const translationCache = new Map<string, string>();
-  const ADMIN_PASSWORD =
-    process.env.ADMIN_PASSWORD ||
-    (process.env.NODE_ENV === "production" ? "" : "admin");
-  const ADMIN_SESSION_SECRET =
-    process.env.ADMIN_SESSION_SECRET ||
-    ADMIN_PASSWORD ||
-    "dev-admin-session-secret";
+  const ADMIN_PASSWORD = config.adminPassword;
+  const ADMIN_SESSION_SECRET = config.adminSessionSecret;
   const ADMIN_COOKIE = "menu_admin_session";
   const ADMIN_SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+  const publicMenuCache = new PublicMenuCache();
   const sessionConfig: AdminSessionConfig = {
     cookieName: ADMIN_COOKIE,
     secret: ADMIN_SESSION_SECRET,
     maxAgeMs: ADMIN_SESSION_MAX_AGE_MS,
-    secure: process.env.NODE_ENV === "production",
+    secure: config.isProduction,
   };
-  const POPULARITY_TIME_ZONE =
-    process.env.POPULARITY_TIME_ZONE || "Europe/Skopje";
+  const POPULARITY_TIME_ZONE = config.popularityTimeZone;
   const POPULARITY_CUTOFF_HOUR = 3;
   const {
     getCategoryById,
@@ -88,18 +99,18 @@ export async function startServer(options: { listen?: boolean } = {}) {
   } = createScanStatisticsService(db, {
     timeZone: POPULARITY_TIME_ZONE,
   });
-  if (!process.env.ADMIN_PASSWORD) {
+  if (!config.adminPassword) {
     console.warn(
-      process.env.NODE_ENV === "production"
+      config.isProduction
         ? "[auth] ADMIN_PASSWORD is not set. Admin login is disabled."
         : "[auth] ADMIN_PASSWORD is not set. Using development password: admin",
     );
   }
 
-  const isBlank = (v: any) => v == null || String(v).trim() === "";
-  const optionalText = (v: any) => (isBlank(v) ? null : String(v).trim());
+  const isBlank = (v: unknown) => v == null || String(v).trim() === "";
+  const optionalText = (v: unknown) => (isBlank(v) ? null : String(v).trim());
   const clampInteger = (
-    value: any,
+    value: unknown,
     min: number,
     max: number,
     fallback: number,
@@ -108,7 +119,7 @@ export async function startServer(options: { listen?: boolean } = {}) {
     if (!Number.isFinite(number)) return fallback;
     return Math.min(max, Math.max(min, Math.round(number)));
   };
-  const normalizeLogoFit = (value: any) =>
+  const normalizeLogoFit = (value: unknown) =>
     value === "cover" ? "cover" : "contain";
 
   const translateText = async (text: string, target: "EN" | "BG") => {
@@ -151,40 +162,31 @@ export async function startServer(options: { listen?: boolean } = {}) {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-  app.use((req, _res, next) => {
-    if (req.path.startsWith("/api/")) {
-      console.log(`[api] ${req.method} ${req.originalUrl}`);
+  app.use((req, res, next) => {
+    const startedAt = Date.now();
+    res.on("finish", () => {
+      if (!req.path.startsWith("/api/")) return;
+      const durationMs = Date.now() - startedAt;
+      if (res.statusCode >= 400 || durationMs >= 500) {
+        console.log("[api] " + req.method + " " + req.originalUrl + " " + res.statusCode + " " + durationMs + "ms");
+      }
+    });
+    next();
+  });
+
+  app.use((req, res, next) => {
+    if (req.path.startsWith("/api/") && req.method !== "GET") {
+      res.once("finish", () => {
+        if (res.statusCode < 400) publicMenuCache.clear();
+      });
     }
     next();
   });
 
-  app.post("/api/auth/login", (req, res) => {
-    const { password } = req.body;
-    if (!ADMIN_PASSWORD) {
-      return res.status(503).json({ error: "Admin login is not configured." });
-    }
-
-    const submitted = Buffer.from(String(password || ""));
-    const expected = Buffer.from(ADMIN_PASSWORD);
-    const isValid =
-      submitted.length === expected.length &&
-      crypto.timingSafeEqual(submitted, expected);
-
-    if (!isValid) {
-      return res.status(401).json({ error: "Invalid password." });
-    }
-
-    setAdminCookie(res, sessionConfig, createAdminSession(sessionConfig));
-    res.json({ authenticated: true });
-  });
-
-  app.post("/api/auth/logout", (_req, res) => {
-    clearAdminCookie(res, sessionConfig);
-    res.json({ authenticated: false });
-  });
-
-  app.get("/api/auth/session", (req, res) => {
-    res.json({ authenticated: isAdminSessionValid(req.headers.cookie, sessionConfig) });
+  registerHealthRoute(app, db);
+  registerAuthRoutes(app, {
+    password: ADMIN_PASSWORD,
+    sessionConfig,
   });
 
   app.use("/api", (req, res, next) => {
@@ -202,26 +204,26 @@ export async function startServer(options: { listen?: boolean } = {}) {
     res.status(401).json({ error: "Admin login required." });
   });
 
-  const getStoredImage = (type: string, id: any) => {
+  const getStoredImage = (type: string, id: number | string) => {
     if (type === "product") {
       const row = db
         .prepare("SELECT image_url FROM products WHERE id = ?")
-        .get(id) as any;
+        .get(id) as ImageRow | undefined;
       return row?.image_url as string | null | undefined;
     }
     if (type === "category") {
       const row = db
         .prepare("SELECT image_url FROM categories WHERE id = ?")
-        .get(id) as any;
+        .get(id) as ImageRow | undefined;
       return row?.image_url as string | null | undefined;
     }
     throw new Error("Unsupported image type.");
   };
 
-  const getOrCreateRestaurantBySlug = (slug: string) => {
+  const getOrCreateRestaurantBySlug = (slug: string): RestaurantDbRow => {
     let restaurant = db
       .prepare("SELECT * FROM restaurants WHERE slug = ?")
-      .get(slug) as any;
+      .get(slug) as RestaurantDbRow | undefined;
 
     if (!restaurant) {
       const name =
@@ -250,12 +252,14 @@ export async function startServer(options: { listen?: boolean } = {}) {
         facebook_url: null,
         instagram_url: null,
         popular_badges_enabled: 1,
+        search_enabled: 1,
         popular_category_id: null,
         popular_category_period_key: null,
         popular_category_updated_at: null,
       };
     }
 
+    if (!restaurant) throw new Error("Could not create restaurant.");
     return restaurant;
   };
 
@@ -266,8 +270,8 @@ export async function startServer(options: { listen?: boolean } = {}) {
 
     // Fetch current month's scans
     try {
-      const scanRow = db.prepare("SELECT scan_count FROM menu_scans WHERE restaurant_id = ? AND month_key = ?").get(restaurant.id, formatMonthKey(new Date(), POPULARITY_TIME_ZONE)) as any;
-      restaurant.current_month_scans = scanRow ? scanRow.scan_count : 0;
+      const scanRow = db.prepare("SELECT scan_count FROM menu_scans WHERE restaurant_id = ? AND month_key = ?").get(restaurant.id, formatMonthKey(new Date(), POPULARITY_TIME_ZONE)) as { scan_count?: number | bigint } | undefined;
+      restaurant.current_month_scans = scanRow ? Number(scanRow.scan_count || 0) : 0;
     } catch(e) {
       console.error("Error fetching scan count", e);
       restaurant.current_month_scans = 0;
@@ -283,9 +287,6 @@ export async function startServer(options: { listen?: boolean } = {}) {
     }
     return value;
   };
-
-  const readScanSource = (value: unknown): "qr" | "direct" =>
-    value === "qr" ? "qr" : "direct";
 
   app.get("/api/restaurant/:id/scan-statistics", (req, res) => {
     try {
@@ -304,7 +305,7 @@ export async function startServer(options: { listen?: boolean } = {}) {
       );
     } catch (error: unknown) {
       const status = error instanceof HttpError ? error.status : 500;
-      console.error("[api] Error loading scan statistics:", error);
+      if (!(error instanceof HttpError)) console.error("[api] Error loading scan statistics:", error);
       res
         .status(status)
         .json({ error: errorMessage(error, "Could not load scan statistics.") });
@@ -346,7 +347,7 @@ export async function startServer(options: { listen?: boolean } = {}) {
       res.send(Buffer.from(exportResult.content, "utf8"));
     } catch (error: unknown) {
       const status = error instanceof HttpError ? error.status : 500;
-      console.error("[api] Error exporting scan statistics:", error);
+      if (!(error instanceof HttpError)) console.error("[api] Error exporting scan statistics:", error);
       res
         .status(status)
         .json({ error: errorMessage(error, "Could not export scan statistics.") });
@@ -369,9 +370,9 @@ export async function startServer(options: { listen?: boolean } = {}) {
         .prepare("UPDATE restaurants SET slug = ? WHERE id = ?")
         .run(slug, id);
       res.json({ success: true, changes: result.changes, slug });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[api] Error updating restaurant slug:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: errorMessage(error) });
     }
   });
 
@@ -435,48 +436,24 @@ export async function startServer(options: { listen?: boolean } = {}) {
         );
 
       res.json({ success: true, changes: result.changes });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[api] Error updating restaurant:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: errorMessage(error) });
     }
   });
 
   // ─── MENU ──────────────────────────────────────────────────────────────────
 
-  app.get("/api/public-menu/:slug", (req, res) => {
-    const restaurant = refreshPopularCategory(
-      getOrCreateRestaurantBySlug(req.params.slug),
-    );
-
-    // Track monthly and daily scan counts without changing the public response.
-    try {
-      recordMenuScan(restaurant.id, undefined, readScanSource(req.query.source));
-    } catch (error: unknown) {
-      console.error("[api] Error tracking scan:", error);
-    }
-    const publicRestaurant = {
-      ...restaurant,
-      background_url: compactImageUrl(
-        "restaurants",
-        restaurant.id,
-        restaurant.background_url,
-        "background",
-      ),
-      logo_url: compactImageUrl(
-        "restaurants",
-        restaurant.id,
-        restaurant.logo_url,
-        "logo",
-      ),
-    };
-    const menu = applyPopularCategory(
-      buildMenu(db, restaurant.id, true),
-      restaurant,
-    );
-    res.setHeader("Cache-Control", "no-store");
-    res.json(toJSON({ restaurant: publicRestaurant, menu }));
+  registerPublicMenuRoute(app, {
+    db,
+    cache: publicMenuCache,
+    getRestaurantBySlug: getOrCreateRestaurantBySlug,
+    refreshPopularCategory: (restaurant) =>
+      refreshPopularCategory(restaurant) as RestaurantDbRow,
+    recordMenuScan,
+    applyPopularCategory: (menu, restaurant) =>
+      applyPopularCategory(menu, restaurant),
   });
-
   app.post("/api/popularity/category-view", (req, res) => {
     try {
       const restaurantId = Number(req.body?.restaurant_id);
@@ -500,9 +477,9 @@ export async function startServer(options: { listen?: boolean } = {}) {
       );
 
       res.json({ success: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[api] Error tracking category view:", error);
-      res.status(500).json({ error: error.message || "Could not track view." });
+      res.status(500).json({ error: errorMessage(error) || "Could not track view." });
     }
   });
 
@@ -518,11 +495,11 @@ export async function startServer(options: { listen?: boolean } = {}) {
       if (!restaurant)
         return res.status(404).json({ error: "Restaurant not found." });
       res.json(toJSON(getPopularCategoryStats(restaurantId)));
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[api] Error loading category popularity:", error);
       res
         .status(500)
-        .json({ error: error.message || "Could not load popularity." });
+        .json({ error: errorMessage(error) || "Could not load popularity." });
     }
   });
 
@@ -539,10 +516,11 @@ export async function startServer(options: { listen?: boolean } = {}) {
       if (result.changes === 0) {
         return res.status(404).json({ error: "Restaurant not found." });
       }
+      publicMenuCache.clear();
       res.json({ success: true, enabled: enabled === 1 });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[api] Error updating popular badges setting:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: errorMessage(error) });
     }
   });
 
@@ -560,7 +538,7 @@ export async function startServer(options: { listen?: boolean } = {}) {
       }
       const restaurant = db
         .prepare("SELECT id, reviews_enabled FROM restaurants WHERE id = ?")
-        .get(restaurantId) as any;
+        .get(restaurantId) as ReviewSettingsRow | undefined;
       if (!restaurant)
         return res.status(404).json({ error: "Restaurant not found." });
       if (restaurant.reviews_enabled === 0) {
@@ -576,11 +554,11 @@ export async function startServer(options: { listen?: boolean } = {}) {
         )
         .all(restaurantId);
       res.json({ reviews: toJSON(reviews), reviews_enabled: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[api] Error fetching reviews:", error);
       res
         .status(500)
-        .json({ error: error.message || "Could not load reviews." });
+        .json({ error: errorMessage(error) || "Could not load reviews." });
     }
   });
 
@@ -593,7 +571,7 @@ export async function startServer(options: { listen?: boolean } = {}) {
       }
       const restaurant = db
         .prepare("SELECT id, reviews_enabled FROM restaurants WHERE id = ?")
-        .get(restaurantId) as any;
+        .get(restaurantId) as ReviewSettingsRow | undefined;
       if (!restaurant)
         return res.status(404).json({ error: "Restaurant not found." });
       if (restaurant.reviews_enabled === 0) {
@@ -659,11 +637,11 @@ export async function startServer(options: { listen?: boolean } = {}) {
         );
 
       res.status(201).json({ review: toJSON(newReview) });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[api] Error submitting review:", error);
       res
         .status(500)
-        .json({ error: error.message || "Could not submit review." });
+        .json({ error: errorMessage(error) || "Could not submit review." });
     }
   });
 
@@ -682,11 +660,11 @@ export async function startServer(options: { listen?: boolean } = {}) {
         return res.status(404).json({ error: "Review not found." });
       }
       res.json({ success: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[api] Error deleting review:", error);
       res
         .status(500)
-        .json({ error: error.message || "Could not delete review." });
+        .json({ error: errorMessage(error) || "Could not delete review." });
     }
   });
 
@@ -702,24 +680,50 @@ export async function startServer(options: { listen?: boolean } = {}) {
       if (result.changes === 0) {
         return res.status(404).json({ error: "Restaurant not found." });
       }
+      publicMenuCache.clear();
       res.json({ success: true, enabled: enabled === 1 });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[api] Error updating reviews setting:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: errorMessage(error) });
     }
   });
 
+  // PUT toggle search_enabled (admin only)
+  app.put("/api/restaurant/:id/search-enabled", (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        throw new HttpError(400, "Invalid restaurant ID.");
+      }
+      if (typeof req.body?.enabled !== "boolean") {
+        throw new HttpError(400, "enabled must be a boolean.");
+      }
+      const enabled = req.body.enabled ? 1 : 0;
+      const result = db
+        .prepare("UPDATE restaurants SET search_enabled = ? WHERE id = ?")
+        .run(enabled, id);
+      if (result.changes === 0) {
+        return res.status(404).json({ error: "Restaurant not found." });
+      }
+      publicMenuCache.clear();
+      res.json({ success: true, enabled: enabled === 1 });
+    } catch (error: unknown) {
+      console.error("[api] Error updating search setting:", error);
+      const status = error instanceof HttpError ? error.status : 500;
+      res.status(status).json({ error: errorMessage(error) });
+    }
+  });
   app.get("/api/images/categories/:id", (req, res) => {
     const row = db
       .prepare("SELECT image_url FROM categories WHERE id = ?")
-      .get(req.params.id) as any;
+      .get(req.params.id) as ImageRow | undefined;
     dataUrlToResponse(row?.image_url, res);
   });
 
   app.get("/api/images/products/:id", (req, res) => {
     const row = db
       .prepare("SELECT image_url FROM products WHERE id = ?")
-      .get(req.params.id) as any;
+      .get(req.params.id) as ImageRow | undefined;
     dataUrlToResponse(row?.image_url, res);
   });
 
@@ -728,7 +732,7 @@ export async function startServer(options: { listen?: boolean } = {}) {
       req.params.field === "background" ? "background_url" : "logo_url";
     const row = db
       .prepare(`SELECT ${field} AS image_url FROM restaurants WHERE id = ?`)
-      .get(req.params.id) as any;
+      .get(req.params.id) as ImageRow | undefined;
     dataUrlToResponse(row?.image_url, res);
   });
 
@@ -742,10 +746,10 @@ export async function startServer(options: { listen?: boolean } = {}) {
       res.json({
         image_url: `data:image/png;base64,${output.toString("base64")}`,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Transparent preview error:", error);
       res.status(400).json({
-        error: error?.message || "Could not make this image transparent.",
+        error: errorMessage(error) || "Could not make this image transparent.",
       });
     }
   });
@@ -758,9 +762,9 @@ export async function startServer(options: { listen?: boolean } = {}) {
         req.params.id,
       );
       res.json(toJSON({ id: Number(req.params.id), image_url: imageUrl }));
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Product image update error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: errorMessage(error) });
     }
   });
 
@@ -772,18 +776,18 @@ export async function startServer(options: { listen?: boolean } = {}) {
         req.params.id,
       );
       res.json(toJSON({ id: Number(req.params.id), image_url: imageUrl }));
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Category image update error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: errorMessage(error) });
     }
   });
 
   app.get("/api/menu/:restaurantId", (req, res) => {
     try {
       res.json(toJSON(buildMenu(db, req.params.restaurantId)));
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[api] Error loading menu:", error);
-      res.status(500).json({ error: error.message || "Could not load menu." });
+      res.status(500).json({ error: errorMessage(error) || "Could not load menu." });
     }
   });
   // ─── CATEGORIES ────────────────────────────────────────────────────────────
@@ -839,9 +843,9 @@ export async function startServer(options: { listen?: boolean } = {}) {
           subcategories: [],
         }),
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error adding category:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: errorMessage(error) });
     }
   });
 
@@ -851,7 +855,7 @@ export async function startServer(options: { listen?: boolean } = {}) {
 
     const existing = db
       .prepare("SELECT * FROM categories WHERE id = ?")
-      .get(id) as any;
+      .get(id) as CategoryDbRow | undefined;
     const baseName = !isBlank(name)
       ? String(name)
       : String(existing?.name ?? "");
@@ -994,9 +998,9 @@ export async function startServer(options: { listen?: boolean } = {}) {
           additions: savedAdditions,
         }),
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error adding product:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: errorMessage(error) });
     }
   });
 
@@ -1023,7 +1027,7 @@ export async function startServer(options: { listen?: boolean } = {}) {
 
       const existing = db
         .prepare("SELECT * FROM products WHERE id = ?")
-        .get(productId) as any;
+        .get(productId) as Product | undefined;
 
       const baseName =
         name !== undefined ? String(name) : String(existing?.name ?? "");
@@ -1109,9 +1113,9 @@ export async function startServer(options: { listen?: boolean } = {}) {
           additions: savedAdditions,
         }),
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error updating product:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: errorMessage(error) });
     }
   });
 
@@ -1125,8 +1129,8 @@ export async function startServer(options: { listen?: boolean } = {}) {
         productId,
       );
       res.json({ success: true, id: productId, is_available });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ error: errorMessage(error) });
     }
   });
 
@@ -1163,7 +1167,7 @@ export async function startServer(options: { listen?: boolean } = {}) {
       "INSERT INTO additions (product_id, name, name_en, name_bg, price) VALUES (?, ?, ?, ?, ?)",
     );
 
-    const transaction = db.transaction((productList: any[]) => {
+    const transaction = db.transaction((productList: ProductDraft[]) => {
       const maxOrderRow = db
         .prepare(
           "SELECT MAX(sort_order) as maxOrder FROM products WHERE category_id = ?",
@@ -1256,9 +1260,9 @@ export async function startServer(options: { listen?: boolean } = {}) {
 
       transaction(enriched);
       res.json({ success: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Bulk import error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: errorMessage(error) });
     }
   });
 
@@ -1270,13 +1274,13 @@ export async function startServer(options: { listen?: boolean } = {}) {
 
       const category = db
         .prepare("SELECT * FROM categories WHERE id = ?")
-        .get(categoryId) as any;
+        .get(categoryId) as CategoryDbRow | undefined;
       if (!category) {
         res.status(404).json({ error: "Category not found" });
         return;
       }
 
-      const escapeDelimited = (val: any, delimiter: string) => {
+      const escapeDelimited = (val: unknown, delimiter: string) => {
         const s = val === null || val === undefined ? "" : String(val);
         const needsQuotes =
           s.includes('"') ||
@@ -1287,13 +1291,13 @@ export async function startServer(options: { listen?: boolean } = {}) {
         return needsQuotes ? `"${escaped}"` : escaped;
       };
 
-      const escapeTsv = (val: any) =>
+      const escapeTsv = (val: unknown) =>
         (val === null || val === undefined ? "" : String(val))
           .replace(/\t/g, " ")
           .replace(/\r?\n|\r/g, " ")
           .trim();
 
-      const exportImageValue = (value: any) => {
+      const exportImageValue = (value: unknown) => {
         const image =
           value === null || value === undefined ? "" : String(value).trim();
         return image.startsWith("data:image/") ? "" : image;
@@ -1331,7 +1335,7 @@ export async function startServer(options: { listen?: boolean } = {}) {
         .prepare(
           "SELECT * FROM products WHERE category_id = ? ORDER BY sort_order, id",
         )
-        .all(categoryId) as any[];
+        .all(categoryId) as Product[];
       const getAdditions = db.prepare(
         "SELECT * FROM additions WHERE product_id = ? ORDER BY id",
       );
@@ -1352,7 +1356,7 @@ export async function startServer(options: { listen?: boolean } = {}) {
       );
 
       for (const p of products) {
-        const additions = getAdditions.all(p.id) as any[];
+        const additions = getAdditions.all(p.id) as Addition[];
         const additionsStr = (additions || [])
           .map((a) => {
             const hasTranslations =
@@ -1392,10 +1396,10 @@ export async function startServer(options: { listen?: boolean } = {}) {
       res.send(
         Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(tsv, "utf16le")]),
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("CSV export error:", error);
       if (!res.headersSent) {
-        res.status(500).json({ error: error.message || "Export failed" });
+        res.status(500).json({ error: errorMessage(error) || "Export failed" });
       }
     }
   });
@@ -1410,7 +1414,9 @@ export async function startServer(options: { listen?: boolean } = {}) {
 
   // ─── VITE / STATIC ────────────────────────────────────────────────────────
 
-  if (process.env.NODE_ENV !== "production") {
+  app.use("/api", apiErrorHandler);
+
+  if (!config.isProduction) {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -1426,8 +1432,24 @@ export async function startServer(options: { listen?: boolean } = {}) {
 
   if (options.listen === false) return app;
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`\n🍽️  Menu QR Server running on http://localhost:${PORT}\n`);
+  const server = app.listen(PORT, "0.0.0.0", () => {
+    console.log("Menu QR Server running on http://localhost:" + PORT);
+  });
+  const shutdown = () => {
+    server.close(() => {
+      if (db.open) {
+        db.close();
+        openDatabases.delete(db);
+      }
+    });
+  };
+  process.once("SIGTERM", shutdown);
+  process.once("SIGINT", shutdown);
+  server.once("close", () => {
+    if (db.open) {
+      db.close();
+      openDatabases.delete(db);
+    }
   });
   return app;
 }

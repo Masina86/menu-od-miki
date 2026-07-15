@@ -319,7 +319,7 @@ export const ImageModal: React.FC<ImageModalProps> = ({
                       {t("allergens")}
                     </h3>
                     <div className="flex flex-wrap gap-2">
-                      {allergens.map((a: any) => (
+                      {allergens.map((a) => (
                         <span
                           key={a}
                           title={
@@ -336,7 +336,7 @@ export const ImageModal: React.FC<ImageModalProps> = ({
                     <p className={`text-[10px] mt-1 ${labelText}`}>
                       {allergens
                         .map(
-                          (a: any) =>
+                          (a) =>
                             ALLERGEN_LABELS[
                               a as keyof typeof ALLERGEN_LABELS
                             ]?.[language] || a,

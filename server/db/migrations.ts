@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
 import { openDatabase } from "./connection.js";
 
-const CURRENT_SCHEMA_VERSION = 3;
+const CURRENT_SCHEMA_VERSION = 4;
 
 function existingColumns(db: Database.Database, table: string): Set<string> {
   const rows = db.pragma(`table_info(${table})`) as Array<{ name: string }>;
@@ -152,6 +152,7 @@ function addCurrentColumns(db: Database.Database) {
     ["popular_category_period_key", "TEXT"],
     ["popular_category_updated_at", "TEXT"],
     ["reviews_enabled", "INTEGER DEFAULT 1"],
+    ["search_enabled", "INTEGER DEFAULT 1"],
     ["takeover_enabled", "INTEGER DEFAULT 0"],
     ["takeover_title", "TEXT"],
     ["takeover_message", "TEXT"],

@@ -172,8 +172,8 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({
         mime === "image/png" ? undefined : outputQuality,
       );
       onCropComplete(result);
-    } catch (cropError: any) {
-      setError(cropError?.message || "Could not crop this image.");
+    } catch (cropError: unknown) {
+      setError(cropError instanceof Error ? cropError.message : "Could not crop this image.");
       setIsProcessing(false);
     }
   };

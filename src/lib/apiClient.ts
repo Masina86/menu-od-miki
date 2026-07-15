@@ -49,6 +49,10 @@ export async function request<T>(
   }
 }
 
+export function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
 export function jsonRequest<T>(
   input: RequestInfo | URL,
   method: "POST" | "PUT" | "PATCH" | "DELETE",

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { lazy, Suspense, useState, useEffect, useMemo, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import {
@@ -25,20 +25,30 @@ import {
   Sparkles,
   Upload,
   BarChart3,
+  Search,
 } from "lucide-react";
 import { motion, AnimatePresence, Reorder } from "motion/react";
 import type { Restaurant, Category, Product, LogoFit } from "../../../shared/types";
 import { ImageModal } from "../../components/media/ImageModal";
 import { AllergenPicker } from "../../components/allergens/AllergenIcons";
 import { ApiError, apiRequest, jsonRequest } from "../../lib/apiClient";
-import { ImageCropper } from "../../components/media/ImageCropper";
 import AdminLoginView from "./AdminLoginView";
+
+const LazyImageCropper = lazy(() =>
+  import("../../components/media/ImageCropper").then(({ ImageCropper }) => ({
+    default: ImageCropper,
+  }))
+);
 
 type NoticeType = "info" | "success" | "error";
 
 interface Notice {
   type: NoticeType;
   message: string;
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "";
 }
 
 interface PopularCategoryStats {
@@ -62,6 +72,7 @@ interface PopularCategoryStats {
 }
 
 type ProductFormData = Omit<Product, "id" | "category_id" | "sort_order" | "additions"> & { additions?: Array<Omit<NonNullable<Product["additions"]>[number], "id" | "product_id">>; };
+type CategoryUpdatePayload = { name: string; image_url?: string };
 
 interface TransparentPreviewResponse {
   image_url: string;
@@ -262,7 +273,7 @@ interface CategorySectionProps {
   onDelete: (id: number, parentId?: number | null) => void;
   onUpdateCategory: (
     id: number,
-    data: any,
+    data: CategoryUpdatePayload,
     parentId?: number | null,
   ) => Promise<void>;
   onUpdateCategoryImage: (
@@ -305,7 +316,7 @@ interface CategorySectionProps {
   ) => void;
   onAddSubcategory: (parentId: number, name: string) => Promise<void>;
   onReorderSubcategories: (parentId: number, newOrder: Category[]) => void;
-  onBulkImport: (categoryId: number, products: any[]) => Promise<void>;
+  onBulkImport: (categoryId: number, products: ProductFormData[]) => Promise<void>;
   isExpanded: boolean;
   onToggle: () => void;
   isSubcategory?: boolean;
@@ -409,10 +420,10 @@ const CategorySection: React.FC<CategorySectionProps> = ({
         onApply: options.onApply,
       });
       setFormNotice(null);
-    } catch (error: any) {
+    } catch (error: unknown) {
       setFormNotice({
         type: "error",
-        message: error?.message || "Could not make this image transparent.",
+        message: getErrorMessage(error) || "Could not make this image transparent.",
       });
     } finally {
       setTransparentAction(null);
@@ -426,10 +437,10 @@ const CategorySection: React.FC<CategorySectionProps> = ({
       await transparentDialog.onApply(transparentDialog.resultUrl);
       setTransparentDialog(null);
       setFormNotice({ type: "success", message: "Transparent image applied." });
-    } catch (error: any) {
+    } catch (error: unknown) {
       setFormNotice({
         type: "error",
-        message: error?.message || "Could not apply transparent image.",
+        message: getErrorMessage(error) || "Could not apply transparent image.",
       });
     } finally {
       setIsApplyingTransparent(false);
@@ -518,10 +529,10 @@ const CategorySection: React.FC<CategorySectionProps> = ({
         message: editingProduct ? "Product updated." : "Product added.",
       });
       resetForm();
-    } catch (error: any) {
+    } catch (error: unknown) {
       setFormNotice({
         type: "error",
-        message: error?.message || "Could not save product.",
+        message: getErrorMessage(error) || "Could not save product.",
       });
     } finally {
       setIsSavingProduct(false);
@@ -659,10 +670,10 @@ const CategorySection: React.FC<CategorySectionProps> = ({
       );
       setIsEditingCategory(false);
       setFormNotice({ type: "success", message: "Category updated." });
-    } catch (error: any) {
+    } catch (error: unknown) {
       setFormNotice({
         type: "error",
-        message: error?.message || "Could not update category.",
+        message: getErrorMessage(error) || "Could not update category.",
       });
     } finally {
       setIsSavingCategory(false);
@@ -878,15 +889,15 @@ const CategorySection: React.FC<CategorySectionProps> = ({
           type: "info",
           message: `Parsed ${parsed.length} products. Uploading...`,
         });
-        await onBulkImport(category.id, parsed as any[]);
+        await onBulkImport(category.id, parsed as ProductFormData[]);
         setImportStatus({
           type: "success",
           message: `Imported ${parsed.length} products.`,
         });
-      } catch (err: any) {
+      } catch (err: unknown) {
         setImportStatus({
           type: "error",
-          message: err?.message ? String(err.message) : "Import failed.",
+          message: getErrorMessage(err) ? getErrorMessage(err) : "Import failed.",
         });
       } finally {
         setIsImporting(false);
@@ -922,10 +933,10 @@ const CategorySection: React.FC<CategorySectionProps> = ({
       URL.revokeObjectURL(url);
 
       setImportStatus({ type: "success", message: `Exported: ${filename}` });
-    } catch (err: any) {
+    } catch (err: unknown) {
       setImportStatus({
         type: "error",
-        message: `Export failed: ${err.message}`,
+        message: `Export failed: ${getErrorMessage(err)}`,
       });
     }
     setTimeout(() => setImportStatus(null), 3000);
@@ -945,10 +956,10 @@ const CategorySection: React.FC<CategorySectionProps> = ({
       setNewSubcategoryName("");
       setIsAddingSubcategory(false);
       setFormNotice({ type: "success", message: "Subcategory added." });
-    } catch (error: any) {
+    } catch (error: unknown) {
       setFormNotice({
         type: "error",
-        message: error?.message || "Could not add subcategory.",
+        message: getErrorMessage(error) || "Could not add subcategory.",
       });
     }
   };
@@ -1904,7 +1915,7 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                             setFormNotice({
                               type: "error",
                               message:
-                                error?.message ||
+                                getErrorMessage(error) ||
                                 "Could not update product availability.",
                             }),
                           );
@@ -1935,7 +1946,7 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                             setFormNotice({
                               type: "error",
                               message:
-                                error?.message || "Could not delete product.",
+                                getErrorMessage(error) || "Could not delete product.",
                             }),
                           );
                         }}
@@ -2008,6 +2019,7 @@ export default function AdminPage() {
   const [footerLink, setFooterLink] = useState("");
   const [popularBadgesEnabled, setPopularBadgesEnabled] = useState(true);
   const [reviewsEnabled, setReviewsEnabled] = useState(true);
+  const [searchEnabled, setSearchEnabled] = useState(true);
   const [takeoverEnabled, setTakeoverEnabled] = useState(false);
   const [takeoverTitle, setTakeoverTitle] = useState("");
   const [takeoverMessage, setTakeoverMessage] = useState("");
@@ -2107,10 +2119,11 @@ export default function AdminPage() {
   useEffect(() => {
     if (slug && authStatus === "authenticated") {
       setLoading(true);
-      fetchData();
+      const controller = new AbortController();
+      void fetchData(controller.signal);
+      return () => controller.abort();
     }
   }, [slug, authStatus]);
-
   const login = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError("");
@@ -2134,8 +2147,8 @@ export default function AdminPage() {
 
       setAdminPassword("");
       setAuthStatus("authenticated");
-    } catch (error: any) {
-      setLoginError(error.message || "Login failed.");
+    } catch (error: unknown) {
+      setLoginError(getErrorMessage(error) || "Login failed.");
     } finally {
       setIsLoggingIn(false);
     }
@@ -2197,6 +2210,7 @@ export default function AdminPage() {
     setFooterLink(rest.footer_link || "");
     setPopularBadgesEnabled(rest.popular_badges_enabled !== 0);
     setReviewsEnabled(rest.reviews_enabled !== 0);
+    setSearchEnabled(rest.search_enabled !== 0);
     setTakeoverEnabled(rest.takeover_enabled !== 0);
     setTakeoverTitle(rest.takeover_title || "");
     setTakeoverMessage(rest.takeover_message || "");
@@ -2205,21 +2219,30 @@ export default function AdminPage() {
     setTakeoverImageUrl(rest.takeover_image_url || "");
   };
 
-  const fetchData = async () => {
+  const fetchData = async (signal?: AbortSignal) => {
     try {
       setAdminNotice(null);
-      const rest = await apiRequest<Restaurant>(`/api/restaurant/${slug}`);
+      const rest = await apiRequest<Restaurant>(
+        "/api/restaurant/" + slug,
+        { signal },
+      );
+      if (signal?.aborted) return;
       setRestaurant(rest);
       applyRestaurantToForm(rest);
 
-      const menuData = await apiRequest<Category[]>(`/api/menu/${rest.id}`);
+      const [menuData, popularity] = await Promise.all([
+        apiRequest<Category[]>("/api/menu/" + rest.id, { signal }),
+        apiRequest<PopularCategoryStats>(
+          "/api/popularity/category/" + rest.id,
+          { signal },
+        ),
+      ]);
+      if (signal?.aborted) return;
       setMenu(menuData);
-      const popularity = await apiRequest<PopularCategoryStats>(
-        `/api/popularity/category/${rest.id}`,
-      );
       setPopularCategoryStats(popularity);
       setPopularBadgesEnabled(popularity.enabled);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      if (signal?.aborted) return;
       if (error instanceof ApiError && error.status === 401) {
         setAuthStatus("unauthenticated");
         return;
@@ -2227,13 +2250,12 @@ export default function AdminPage() {
       console.error("Error fetching data:", error);
       setAdminNotice({
         type: "error",
-        message: error?.message || "Could not load admin data.",
+        message: getErrorMessage(error) || "Could not load admin data.",
       });
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   };
-
   const addCategory = async () => {
     if (!restaurant) return;
     if (!newCategoryName.trim()) {
@@ -2249,14 +2271,14 @@ export default function AdminPage() {
         name: newCategoryName.trim(),
         parent_id: null,
       });
-      setMenu([...menu, newCat]);
+      setMenu((currentMenu) => [...currentMenu, newCat]);
       setNewCategoryName("");
       setAdminNotice({ type: "success", message: "Category added." });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error adding category:", error);
       setAdminNotice({
         type: "error",
-        message: error?.message || "Could not add category.",
+        message: getErrorMessage(error) || "Could not add category.",
       });
     } finally {
       setSavingAction(null);
@@ -2271,18 +2293,17 @@ export default function AdminPage() {
         name: name.trim(),
         parent_id: parentId,
       });
-      setMenu(
-        menu.map((cat) =>
+      setMenu((currentMenu) => currentMenu.map((cat) =>
           cat.id === parentId
             ? { ...cat, subcategories: [...(cat.subcategories || []), newSub] }
             : cat,
         ),
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error adding subcategory:", error);
       setAdminNotice({
         type: "error",
-        message: error?.message || "Could not add subcategory.",
+        message: getErrorMessage(error) || "Could not add subcategory.",
       });
       throw error;
     }
@@ -2294,8 +2315,7 @@ export default function AdminPage() {
       await apiRequest<void>(`/api/categories/${id}`, { method: "DELETE" });
 
       if (parentId) {
-        setMenu(
-          menu.map((cat) =>
+        setMenu((currentMenu) => currentMenu.map((cat) =>
             cat.id === parentId
               ? {
                   ...cat,
@@ -2305,14 +2325,14 @@ export default function AdminPage() {
           ),
         );
       } else {
-        setMenu(menu.filter((c) => c.id !== id));
+        setMenu((currentMenu) => currentMenu.filter((c) => c.id !== id));
       }
       setAdminNotice({ type: "success", message: "Category deleted." });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error deleting category:", error);
       setAdminNotice({
         type: "error",
-        message: error?.message || "Could not delete category.",
+        message: getErrorMessage(error) || "Could not delete category.",
       });
       throw error;
     } finally {
@@ -2332,8 +2352,7 @@ export default function AdminPage() {
         data,
       );
       if (parentId) {
-        setMenu(
-          menu.map((cat) =>
+        setMenu((currentMenu) => currentMenu.map((cat) =>
             cat.id === parentId
               ? {
                   ...cat,
@@ -2345,13 +2364,13 @@ export default function AdminPage() {
           ),
         );
       } else {
-        setMenu(menu.map((c) => (c.id === id ? { ...c, ...updated } : c)));
+        setMenu((currentMenu) => currentMenu.map((c) => (c.id === id ? { ...c, ...updated } : c)));
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error updating category:", error);
       setAdminNotice({
         type: "error",
-        message: error?.message || "Could not update category.",
+        message: getErrorMessage(error) || "Could not update category.",
       });
       throw error;
     }
@@ -2369,8 +2388,7 @@ export default function AdminPage() {
         { image_url: imageUrl },
       );
       if (parentId) {
-        setMenu(
-          menu.map((cat) =>
+        setMenu((currentMenu) => currentMenu.map((cat) =>
             cat.id === parentId
               ? {
                   ...cat,
@@ -2382,13 +2400,13 @@ export default function AdminPage() {
           ),
         );
       } else {
-        setMenu(menu.map((c) => (c.id === id ? { ...c, ...updated } : c)));
+        setMenu((currentMenu) => currentMenu.map((c) => (c.id === id ? { ...c, ...updated } : c)));
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error updating category image:", error);
       setAdminNotice({
         type: "error",
-        message: error?.message || "Could not update category image.",
+        message: getErrorMessage(error) || "Could not update category image.",
       });
       throw error;
     }
@@ -2406,8 +2424,7 @@ export default function AdminPage() {
       });
 
       if (parentId) {
-        setMenu(
-          menu.map((cat) =>
+        setMenu((currentMenu) => currentMenu.map((cat) =>
             cat.id === parentId
               ? {
                   ...cat,
@@ -2421,19 +2438,18 @@ export default function AdminPage() {
           ),
         );
       } else {
-        setMenu(
-          menu.map((cat) =>
+        setMenu((currentMenu) => currentMenu.map((cat) =>
             cat.id === categoryId
               ? { ...cat, products: [...cat.products, newProd] }
               : cat,
           ),
         );
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error adding product:", error);
       setAdminNotice({
         type: "error",
-        message: error?.message || "Could not add product.",
+        message: getErrorMessage(error) || "Could not add product.",
       });
       throw error;
     }
@@ -2453,8 +2469,7 @@ export default function AdminPage() {
       );
 
       if (parentId) {
-        setMenu(
-          menu.map((cat) =>
+        setMenu((currentMenu) => currentMenu.map((cat) =>
             cat.id === parentId
               ? {
                   ...cat,
@@ -2473,8 +2488,7 @@ export default function AdminPage() {
           ),
         );
       } else {
-        setMenu(
-          menu.map((cat) =>
+        setMenu((currentMenu) => currentMenu.map((cat) =>
             cat.id === categoryId
               ? {
                   ...cat,
@@ -2486,11 +2500,11 @@ export default function AdminPage() {
           ),
         );
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error updating product:", error);
       setAdminNotice({
         type: "error",
-        message: error?.message || "Could not update product.",
+        message: getErrorMessage(error) || "Could not update product.",
       });
       throw error;
     }
@@ -2510,8 +2524,7 @@ export default function AdminPage() {
       );
 
       if (parentId) {
-        setMenu(
-          menu.map((cat) =>
+        setMenu((currentMenu) => currentMenu.map((cat) =>
             cat.id === parentId
               ? {
                   ...cat,
@@ -2530,8 +2543,7 @@ export default function AdminPage() {
           ),
         );
       } else {
-        setMenu(
-          menu.map((cat) =>
+        setMenu((currentMenu) => currentMenu.map((cat) =>
             cat.id === categoryId
               ? {
                   ...cat,
@@ -2543,11 +2555,11 @@ export default function AdminPage() {
           ),
         );
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error updating product image:", error);
       setAdminNotice({
         type: "error",
-        message: error?.message || "Could not update product image.",
+        message: getErrorMessage(error) || "Could not update product image.",
       });
       throw error;
     }
@@ -2565,8 +2577,7 @@ export default function AdminPage() {
       });
 
       if (parentId) {
-        setMenu(
-          menu.map((cat) =>
+        setMenu((currentMenu) => currentMenu.map((cat) =>
             cat.id === parentId
               ? {
                   ...cat,
@@ -2585,8 +2596,7 @@ export default function AdminPage() {
           ),
         );
       } else {
-        setMenu(
-          menu.map((cat) =>
+        setMenu((currentMenu) => currentMenu.map((cat) =>
             cat.id === categoryId
               ? {
                   ...cat,
@@ -2597,11 +2607,11 @@ export default function AdminPage() {
         );
       }
       setAdminNotice({ type: "success", message: "Product deleted." });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error deleting product:", error);
       setAdminNotice({
         type: "error",
-        message: error?.message || "Could not delete product.",
+        message: getErrorMessage(error) || "Could not delete product.",
       });
       throw error;
     } finally {
@@ -2626,8 +2636,7 @@ export default function AdminPage() {
     newOrder.splice(newIdx, 0, moved);
 
     if (parentId) {
-      setMenu(
-        menu.map((cat) =>
+      setMenu((currentMenu) => currentMenu.map((cat) =>
           cat.id === parentId ? { ...cat, subcategories: newOrder } : cat,
         ),
       );
@@ -2645,8 +2654,7 @@ export default function AdminPage() {
     parentId: number,
     newOrder: Category[],
   ) => {
-    setMenu(
-      menu.map((cat) =>
+    setMenu((currentMenu) => currentMenu.map((cat) =>
         cat.id === parentId ? { ...cat, subcategories: newOrder } : cat,
       ),
     );
@@ -2679,8 +2687,7 @@ export default function AdminPage() {
     newProducts.splice(newIdx, 0, moved);
 
     if (parentId) {
-      setMenu(
-        menu.map((cat) =>
+      setMenu((currentMenu) => currentMenu.map((cat) =>
           cat.id === parentId
             ? {
                 ...cat,
@@ -2692,8 +2699,7 @@ export default function AdminPage() {
         ),
       );
     } else {
-      setMenu(
-        menu.map((c) =>
+      setMenu((currentMenu) => currentMenu.map((c) =>
           c.id === categoryId ? { ...c, products: newProducts } : c,
         ),
       );
@@ -2818,11 +2824,11 @@ export default function AdminPage() {
         type: "success",
         message: "Restaurant info updated.",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error updating restaurant info:", error);
       setAdminNotice({
         type: "error",
-        message: error?.message || "Could not update restaurant info.",
+        message: getErrorMessage(error) || "Could not update restaurant info.",
       });
     } finally {
       setSavingAction(null);
@@ -2862,12 +2868,12 @@ export default function AdminPage() {
           ? "Daily popular category enabled."
           : "Daily popular category disabled.",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error updating popular badges:", error);
       setPopularBadgesEnabled(previous);
       setAdminNotice({
         type: "error",
-        message: error?.message || "Could not update daily popular category.",
+        message: getErrorMessage(error) || "Could not update daily popular category.",
       });
     } finally {
       setSavingAction(null);
@@ -2901,18 +2907,51 @@ export default function AdminPage() {
           ? "Reviews feature enabled."
           : "Reviews feature disabled.",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error updating reviews enabled setting:", error);
       setReviewsEnabled(previous);
       setAdminNotice({
         type: "error",
-        message: error?.message || "Could not update reviews setting.",
+        message: getErrorMessage(error) || "Could not update reviews setting.",
       });
     } finally {
       setSavingAction(null);
     }
   };
 
+  const updateSearchEnabled = async (enabled: boolean) => {
+    if (!restaurant) return;
+    const previous = searchEnabled;
+    setSearchEnabled(enabled);
+    setSavingAction("search-enabled");
+    setAdminNotice({
+      type: "info",
+      message: enabled ? "Enabling menu search..." : "Disabling menu search...",
+    });
+    try {
+      await jsonRequest(
+        `/api/restaurant/${restaurant.id}/search-enabled`,
+        "PUT",
+        { enabled },
+      );
+      setRestaurant((current) =>
+        current ? { ...current, search_enabled: enabled ? 1 : 0 } : current,
+      );
+      setAdminNotice({
+        type: "success",
+        message: enabled ? "Menu search enabled." : "Menu search disabled.",
+      });
+    } catch (error: unknown) {
+      console.error("Error updating search setting:", error);
+      setSearchEnabled(previous);
+      setAdminNotice({
+        type: "error",
+        message: getErrorMessage(error) || "Could not update search setting.",
+      });
+    } finally {
+      setSavingAction(null);
+    }
+  };
   const saveTakeoverSettings = async () => {
     if (!restaurant) return;
     setSavingAction("takeover");
@@ -2949,11 +2988,11 @@ export default function AdminPage() {
         takeover_image_url: takeoverImageUrl.trim(),
       });
       setAdminNotice({ type: "success", message: "Promo popup settings saved." });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error saving takeover settings:", error);
       setAdminNotice({
         type: "error",
-        message: error?.message || "Could not save promo popup settings.",
+        message: getErrorMessage(error) || "Could not save promo popup settings.",
       });
     } finally {
       setSavingAction(null);
@@ -3803,6 +3842,37 @@ export default function AdminPage() {
           </div>
         </section>
 
+        <section className="mb-8 rounded-xl border border-stone-200 bg-white px-4 py-4">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
+                <Search size={17} />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-stone-900">Menu Search</p>
+                <p className="mt-1 max-w-xl text-xs leading-relaxed text-stone-500">
+                  Show or hide the search bar on the public menu. Disabling it keeps the menu browsing experience category-based.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => void updateSearchEnabled(!searchEnabled)}
+              disabled={savingAction === "search-enabled"}
+              className={`inline-flex min-w-28 items-center justify-center rounded-full px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-60 ${
+                searchEnabled
+                  ? "bg-stone-900 text-white hover:bg-stone-800"
+                  : "border border-stone-300 bg-white text-stone-500 hover:text-stone-900"
+              }`}
+            >
+              {savingAction === "search-enabled"
+                ? "Saving..."
+                : searchEnabled
+                  ? "Enabled"
+                  : "Disabled"}
+            </button>
+          </div>
+        </section>
         {/* ── Special Promo Popup ─────────────────────────── */}
         <section className="mb-8 rounded-xl border border-stone-200 bg-white px-6 py-5">
           <div 
@@ -4021,7 +4091,7 @@ export default function AdminPage() {
                         `/api/menu/${restaurant.id}`,
                       );
                       setMenu(data);
-                    } catch (err: any) {
+                    } catch (err: unknown) {
                       console.error("Bulk import fetch error:", err);
                       throw err;
                     }
@@ -4040,7 +4110,8 @@ export default function AdminPage() {
       </div>
 
       {cropImageSrc && cropTarget && (
-        <ImageCropper
+        <Suspense fallback={<div className="fixed inset-0 z-[70] grid place-items-center bg-black/50 text-white">Loading image tools...</div>}>
+          <LazyImageCropper
           imageSrc={cropImageSrc}
           title={
             cropTarget === "background" ? "Crop Hero Background" : "Crop Logo"
@@ -4061,7 +4132,8 @@ export default function AdminPage() {
             closeCropper();
           }}
           onCancel={closeCropper}
-        />
+          />
+        </Suspense>
       )}
     </div>
   );

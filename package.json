@@ -1,11 +1,16 @@
 {
   "name": "react-example",
   "private": true,
+  "overrides": {
+    "tsx": {
+      "esbuild": "0.28.1"
+    }
+  },
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "vite build && tsc --project tsconfig.server.json",
+    "build": "vite build && npm run bundle:check && tsc --project tsconfig.server.json",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
@@ -16,6 +21,7 @@
     "typecheck": "npm run lint && npm run typecheck:server && npm run typecheck:strict",
     "db:fill-translations": "node scripts/fill-translations.cjs",
     "db:update-slug": "node scripts/update-slug.cjs",
+    "bundle:check": "node scripts/check-bundle-budget.mjs",
     "typecheck:strict": "tsc --project tsconfig.strict.json --pretty false"
   },
   "dependencies": {
