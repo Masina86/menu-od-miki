@@ -25,4 +25,62 @@ describe("legacy database migrations", () => {
     expect(Number((db.pragma("user_version") as Array<{ user_version: number }>)[0].user_version)).toBe(3);
     db.close();
   });
+
+  it("handles an existing canonical slug without losing legacy menu data", () => {
+    const db = new Database(":memory:");
+    migrateDatabase(db);
+
+    db.prepare("INSERT INTO restaurants (name, slug) VALUES (?, ?)").run(
+      "Current",
+      "dismak-oil",
+    );
+    db.prepare("INSERT INTO restaurants (name, slug) VALUES (?, ?)").run(
+      "Legacy",
+      "Dismak-Oil",
+    );
+    db.prepare(
+      "INSERT INTO categories (restaurant_id, name) VALUES (?, ?)",
+    ).run(1, "Current category");
+    db.prepare(
+      "INSERT INTO categories (restaurant_id, name) VALUES (?, ?)",
+    ).run(2, "Legacy category");
+    db.prepare(
+      "INSERT INTO menu_scans (restaurant_id, month_key, scan_count) VALUES (?, ?, ?)",
+    ).run(2, "2026-07", 11);
+
+    expect(() => migrateDatabase(db)).not.toThrow();
+
+    expect(
+      db
+        .prepare("SELECT id, slug FROM restaurants ORDER BY id")
+        .all(),
+    ).toEqual([
+      { id: 1, slug: "dismak-oil" },
+      { id: 2, slug: "dismak-oil-legacy-2" },
+    ]);
+    expect(
+      db
+        .prepare("SELECT restaurant_id, name FROM categories ORDER BY id")
+        .all(),
+    ).toEqual([
+      { restaurant_id: 1, name: "Current category" },
+      { restaurant_id: 2, name: "Legacy category" },
+    ]);
+    expect(
+      db
+        .prepare(
+          "SELECT restaurant_id, month_key, scan_count FROM menu_scans",
+        )
+        .all(),
+    ).toEqual([{ restaurant_id: 2, month_key: "2026-07", scan_count: 11 }]);
+
+    migrateDatabase(db);
+    expect(
+      db.prepare("SELECT id, slug FROM restaurants ORDER BY id").all(),
+    ).toEqual([
+      { id: 1, slug: "dismak-oil" },
+      { id: 2, slug: "dismak-oil-legacy-2" },
+    ]);
+    db.close();
+  });
 });

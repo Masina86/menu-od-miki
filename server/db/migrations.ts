@@ -219,15 +219,97 @@ function createIndexes(db: Database.Database) {
   `);
 }
 
+type RestaurantSlugRow = {
+  id: number;
+  slug: string;
+};
+
+function restaurantCategoryCount(db: Database.Database, restaurantId: number): number {
+  const row = db
+    .prepare("SELECT COUNT(*) AS count FROM categories WHERE restaurant_id = ?")
+    .get(restaurantId) as { count?: number } | undefined;
+  return Number(row?.count || 0);
+}
+
+function nextLegacyRestaurantSlug(
+  db: Database.Database,
+  restaurantId: number,
+): string {
+  const base = `dismak-oil-legacy-${restaurantId}`;
+  let candidate = base;
+  let suffix = 2;
+
+  while (
+    db
+      .prepare("SELECT 1 FROM restaurants WHERE slug = ? AND id != ?")
+      .get(candidate, restaurantId)
+  ) {
+    candidate = `${base}-${suffix++}`;
+  }
+
+  return candidate;
+}
+
 function applyDataMigrations(db: Database.Database) {
-  db.prepare(
-    `DELETE FROM restaurants
-     WHERE slug IN ('demo-restaurant', 'Dismak-Oil')
-       AND id NOT IN (SELECT DISTINCT restaurant_id FROM categories WHERE restaurant_id IS NOT NULL)`,
-  ).run();
-  db.prepare(
-    "UPDATE restaurants SET slug = 'dismak-oil' WHERE slug IN ('demo-restaurant', 'Dismak-Oil')",
-  ).run();
+  const legacyRestaurants = db
+    .prepare(
+      "SELECT id, slug FROM restaurants WHERE slug IN ('demo-restaurant', 'Dismak-Oil')",
+    )
+    .all() as RestaurantSlugRow[];
+  let canonicalRestaurant = db
+    .prepare("SELECT id, slug FROM restaurants WHERE slug = 'dismak-oil'")
+    .get() as RestaurantSlugRow | undefined;
+
+  const candidates = () =>
+    legacyRestaurants.filter((restaurant) => restaurant.id !== canonicalRestaurant?.id);
+  const choosePrimaryLegacy = () =>
+    [...candidates()].sort((left, right) => {
+      const categoryDifference =
+        restaurantCategoryCount(db, right.id) - restaurantCategoryCount(db, left.id);
+      if (categoryDifference !== 0) return categoryDifference;
+      if (left.slug === "Dismak-Oil") return -1;
+      if (right.slug === "Dismak-Oil") return 1;
+      return left.id - right.id;
+    })[0];
+
+  if (!canonicalRestaurant) {
+    const primaryLegacy = choosePrimaryLegacy();
+    if (primaryLegacy) {
+      db.prepare("UPDATE restaurants SET slug = 'dismak-oil' WHERE id = ?").run(
+        primaryLegacy.id,
+      );
+      canonicalRestaurant = { id: primaryLegacy.id, slug: "dismak-oil" };
+    }
+  } else {
+    const primaryLegacy = choosePrimaryLegacy();
+    if (
+      primaryLegacy &&
+      restaurantCategoryCount(db, primaryLegacy.id) >
+        restaurantCategoryCount(db, canonicalRestaurant.id)
+    ) {
+      // Keep the populated legacy menu at the canonical URL. The former
+      // canonical row is retained under a unique slug so no data is lost.
+      const displacedSlug = nextLegacyRestaurantSlug(db, canonicalRestaurant.id);
+      db.prepare("UPDATE restaurants SET slug = ? WHERE id = ?").run(
+        displacedSlug,
+        canonicalRestaurant.id,
+      );
+      db.prepare("UPDATE restaurants SET slug = 'dismak-oil' WHERE id = ?").run(
+        primaryLegacy.id,
+      );
+      canonicalRestaurant = { id: primaryLegacy.id, slug: "dismak-oil" };
+    }
+  }
+
+  // A deployed database may contain both the old and new restaurant slugs.
+  // Rename remaining legacy rows instead of deleting them or violating the
+  // UNIQUE slug constraint. Their related menu and scan records remain intact.
+  for (const legacyRestaurant of candidates()) {
+    db.prepare("UPDATE restaurants SET slug = ? WHERE id = ?").run(
+      nextLegacyRestaurantSlug(db, legacyRestaurant.id),
+      legacyRestaurant.id,
+    );
+  }
 }
 
 export function migrateDatabase(db: Database.Database): void {
