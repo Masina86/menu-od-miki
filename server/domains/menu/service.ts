@@ -1,0 +1,72 @@
+import Database from "better-sqlite3";
+import type { Category, Product } from "../../../shared/types.js";
+import { compactImageUrl } from "../images/dataUrl.js";
+import { buildMenuTree } from "./tree.js";
+
+export function buildMenu(
+  db: Database.Database,
+  restaurantId: string | number,
+  compactImages = false,
+): Category[] {
+  const allCategories = db
+    .prepare(
+      "SELECT * FROM categories WHERE restaurant_id = ? ORDER BY sort_order, id",
+    )
+    .all(restaurantId) as Array<Record<string, unknown>>;
+  const categoryIds = allCategories.map((category) => category.id);
+  const products = categoryIds.length
+    ? (db
+        .prepare(
+          "SELECT * FROM products WHERE category_id IN (" +
+            categoryIds.map(() => "?").join(",") +
+            ") ORDER BY category_id, sort_order, id",
+        )
+        .all(...categoryIds) as Array<Record<string, unknown>>)
+    : [];
+  const productIds = products.map((product) => product.id);
+  const additions = productIds.length
+    ? (db
+        .prepare(
+          "SELECT * FROM additions WHERE product_id IN (" +
+            productIds.map(() => "?").join(",") +
+            ") ORDER BY product_id, id",
+        )
+        .all(...productIds) as Array<Record<string, unknown>>)
+    : [];
+  const additionsByProduct = new Map<number, Array<Record<string, unknown>>>();
+  for (const addition of additions) {
+    const productId = Number(addition.product_id);
+    const list = additionsByProduct.get(productId) || [];
+    list.push(addition);
+    additionsByProduct.set(productId, list);
+  }
+
+  const enrichedProducts = products.map((product) => ({
+    ...product,
+    image_url: compactImages
+      ? compactImageUrl(
+          "products",
+          Number(product.id),
+          typeof product.image_url === "string" ? product.image_url : null,
+        )
+      : product.image_url,
+    additions: additionsByProduct.get(Number(product.id)) || [],
+  }));
+  const enrichedCategories = allCategories.map((category) => ({
+    ...category,
+    image_url: compactImages
+      ? compactImageUrl(
+          "categories",
+          Number(category.id),
+          typeof category.image_url === "string" ? category.image_url : null,
+        )
+      : category.image_url,
+    products: [],
+    subcategories: [],
+  }));
+
+  return buildMenuTree(
+    enrichedCategories as unknown as Category[],
+    enrichedProducts as unknown as Product[],
+  );
+}

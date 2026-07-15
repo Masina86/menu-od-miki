@@ -1,21 +1,33 @@
-import React, { Component, ReactNode } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import AdminPanel from './components/AdminPanel';
-import MenuView from './components/MenuView';
-import ReviewsPage from './components/ReviewsPage';
+import { Component, lazy, Suspense, type ReactNode } from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+
+const AdminPage = lazy(() => import("./features/admin/AdminPage"));
+const ScanStatisticsPage = lazy(
+  () => import("./features/admin/ScanStatisticsPage"),
+);
+const MenuPage = lazy(() => import("./features/menu/MenuPage"));
+const ReviewsPage = lazy(() => import("./features/reviews/ReviewsPage"));
+
+function RouteLoading({ dark }: { dark: boolean }) {
+  return (
+    <div
+      className={
+        "min-h-screen flex items-center justify-center " +
+        (dark
+          ? "bg-stone-900 text-stone-100"
+          : "bg-stone-50 text-stone-900")
+      }
+    >
+      Loading...
+    </div>
+  );
+}
 
 class AdminErrorBoundary extends Component<
   { children: ReactNode },
   { error: Error | null }
 > {
-  private readonly childrenNode: ReactNode;
-
-  constructor(props: { children: ReactNode }) {
-    super(props);
-    this.childrenNode = props.children;
-  }
-
-  state = { error: null };
+  state: { error: Error | null } = { error: null };
 
   static getDerivedStateFromError(error: Error) {
     return { error };
@@ -44,7 +56,7 @@ class AdminErrorBoundary extends Component<
       );
     }
 
-    return this.childrenNode;
+    return this.props.children;
   }
 }
 
@@ -52,25 +64,47 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Default to a demo restaurant for the landing page */}
         <Route path="/" element={<Navigate to="/dismak-oil/admin" replace />} />
-        <Route path="/admin" element={<Navigate to="/dismak-oil/admin" replace />} />
-        
-        {/* Admin Route */}
+        <Route
+          path="/admin"
+          element={<Navigate to="/dismak-oil/admin" replace />}
+        />
+        <Route
+          path="/:slug/admin/statistics"
+          element={
+            <AdminErrorBoundary>
+              <Suspense fallback={<RouteLoading dark={false} />}>
+                <ScanStatisticsPage />
+              </Suspense>
+            </AdminErrorBoundary>
+          }
+        />
         <Route
           path="/:slug/admin"
           element={
             <AdminErrorBoundary>
-              <AdminPanel />
+              <Suspense fallback={<RouteLoading dark={false} />}>
+                <AdminPage />
+              </Suspense>
             </AdminErrorBoundary>
           }
         />
-        
-        {/* Reviews Route */}
-        <Route path="/:slug/reviews" element={<ReviewsPage />} />
-        
-        {/* Customer Route */}
-        <Route path="/:slug" element={<MenuView />} />
+        <Route
+          path="/:slug/reviews"
+          element={
+            <Suspense fallback={<RouteLoading dark />}>
+              <ReviewsPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/:slug"
+          element={
+            <Suspense fallback={<RouteLoading dark />}>
+              <MenuPage />
+            </Suspense>
+          }
+        />
       </Routes>
     </BrowserRouter>
   );

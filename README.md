@@ -8,6 +8,15 @@ This contains everything you need to run your app locally.
 
 View your app in AI Studio: https://ai.studio/apps/1e0f3ed5-d2ad-4051-ab01-aa73bcfce7a2
 
+## Project map
+
+- src/features: the three user-facing areas — menu, admin, and reviews.
+- src/components: only shared media and allergen UI.
+- src/lib: browser API and menu helpers.
+- server: application startup, database, HTTP helpers, and domain modules.
+- shared: types shared by the browser and server.
+- tests and scripts: verification and maintained database tooling.
+
 ## Run Locally
 
 **Prerequisites:**  Node.js

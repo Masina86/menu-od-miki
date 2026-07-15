@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitAny": true,
+    "useUnknownInCatchVariables": true,
+    "noEmit": true
+  },
+  "include": [
+    "shared/**/*.ts",
+    "server/config.ts",
+    "server/db/**/*.ts",
+    "server/http/**/*.ts",
+    "server/domains/**/*.ts",
+    "src/lib/**/*.ts",
+    "tests/**/*.ts"
+  ]
+}
