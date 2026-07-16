@@ -31,8 +31,14 @@ import { motion, AnimatePresence, Reorder } from "motion/react";
 import type { Restaurant, Category, Product, LogoFit } from "../../../shared/types";
 import { ImageModal } from "../../components/media/ImageModal";
 import { AllergenPicker } from "../../components/allergens/AllergenIcons";
-import { ApiError, apiRequest, jsonRequest } from "../../lib/apiClient";
+import {
+  ApiError,
+  apiRequest,
+  jsonRequest,
+  uploadImageRequest,
+} from "../../lib/apiClient";
 import AdminLoginView from "./AdminLoginView";
+import { internalImageUrl } from "../../lib/media";
 
 const LazyImageCropper = lazy(() =>
   import("../../components/media/ImageCropper").then(({ ImageCropper }) => ({
@@ -1002,7 +1008,7 @@ const CategorySection: React.FC<CategorySectionProps> = ({
             {category.image_url && (
               <div className="relative">
                 <img
-                  src={category.image_url}
+                  src={internalImageUrl(category.image_url, 320)}
                   alt=""
                   className="h-8 w-8 rounded-full border border-stone-200 object-cover"
                 />
@@ -1167,7 +1173,7 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                 {categoryEditData.image_url && (
                   <div className="relative">
                     <img
-                      src={categoryEditData.image_url}
+                      src={internalImageUrl(categoryEditData.image_url, 320)}
                       alt="Preview"
                       className="h-10 w-10 rounded-full border border-stone-200 object-cover"
                     />
@@ -1798,7 +1804,7 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                         onClick={() => setSelectedProductForModal(product)}
                       >
                         <img
-                          src={product.image_url}
+                          src={internalImageUrl(product.image_url, 320)}
                           alt={product.name}
                           className="w-16 h-16 object-cover rounded-xl border border-stone-100"
                         />
@@ -2346,11 +2352,20 @@ export default function AdminPage() {
     parentId: number | null = null,
   ) => {
     try {
-      const updated = await jsonRequest<Partial<Category>>(
+      const pendingImage =
+        data.image_url && isDataImageUrl(data.image_url) ? data.image_url : null;
+      let updated = await jsonRequest<Partial<Category>>(
         `/api/categories/${id}`,
         "PUT",
-        data,
+        pendingImage ? { ...data, image_url: undefined } : data,
       );
+      if (pendingImage) {
+        const imageUpdate = await uploadImageRequest<Partial<Category>>(
+          `/api/images/categories/${id}`,
+          pendingImage,
+        );
+        updated = { ...updated, ...imageUpdate };
+      }
       if (parentId) {
         setMenu((currentMenu) => currentMenu.map((cat) =>
             cat.id === parentId
@@ -2382,11 +2397,16 @@ export default function AdminPage() {
     parentId: number | null = null,
   ) => {
     try {
-      const updated = await jsonRequest<Partial<Category>>(
-        `/api/categories/${id}/image`,
-        "PATCH",
-        { image_url: imageUrl },
-      );
+      const updated = isDataImageUrl(imageUrl)
+        ? await uploadImageRequest<Partial<Category>>(
+            `/api/images/categories/${id}`,
+            imageUrl,
+          )
+        : await jsonRequest<Partial<Category>>(
+            `/api/categories/${id}/image`,
+            "PATCH",
+            { image_url: imageUrl },
+          );
       if (parentId) {
         setMenu((currentMenu) => currentMenu.map((cat) =>
             cat.id === parentId
@@ -2418,10 +2438,22 @@ export default function AdminPage() {
     parentId: number | null = null,
   ) => {
     try {
-      const newProd = await jsonRequest<Product>("/api/products", "POST", {
+      const pendingImage =
+        product.image_url && isDataImageUrl(product.image_url)
+          ? product.image_url
+          : null;
+      let newProd = await jsonRequest<Product>("/api/products", "POST", {
         category_id: categoryId,
         ...product,
+        image_url: pendingImage ? undefined : product.image_url,
       });
+      if (pendingImage) {
+        const imageUpdate = await uploadImageRequest<Partial<Product>>(
+          `/api/images/products/${newProd.id}`,
+          pendingImage,
+        );
+        newProd = { ...newProd, ...imageUpdate };
+      }
 
       if (parentId) {
         setMenu((currentMenu) => currentMenu.map((cat) =>
@@ -2462,11 +2494,22 @@ export default function AdminPage() {
     parentId: number | null = null,
   ) => {
     try {
-      const updatedProd = await jsonRequest<Product>(
+      const pendingImage =
+        product.image_url && isDataImageUrl(product.image_url)
+          ? product.image_url
+          : null;
+      let updatedProd = await jsonRequest<Product>(
         `/api/products/${productId}`,
         "PUT",
-        product,
+        pendingImage ? { ...product, image_url: undefined } : product,
       );
+      if (pendingImage) {
+        const imageUpdate = await uploadImageRequest<Partial<Product>>(
+          `/api/images/products/${productId}`,
+          pendingImage,
+        );
+        updatedProd = { ...updatedProd, ...imageUpdate };
+      }
 
       if (parentId) {
         setMenu((currentMenu) => currentMenu.map((cat) =>
@@ -2517,11 +2560,16 @@ export default function AdminPage() {
     parentId: number | null = null,
   ) => {
     try {
-      const updatedProd = await jsonRequest<Partial<Product>>(
-        `/api/products/${productId}/image`,
-        "PATCH",
-        { image_url: imageUrl },
-      );
+      const updatedProd = isDataImageUrl(imageUrl)
+        ? await uploadImageRequest<Partial<Product>>(
+            `/api/images/products/${productId}`,
+            imageUrl,
+          )
+        : await jsonRequest<Partial<Product>>(
+            `/api/products/${productId}/image`,
+            "PATCH",
+            { image_url: imageUrl },
+          );
 
       if (parentId) {
         setMenu((currentMenu) => currentMenu.map((cat) =>
@@ -2767,10 +2815,34 @@ export default function AdminPage() {
     setSavingAction("restaurant");
     setAdminNotice({ type: "info", message: "Saving restaurant info..." });
     try {
+      let savedBackgroundUrl = trimmedBackgroundUrl;
+      let savedLogoUrl = trimmedLogoUrl;
+      let savedTakeoverUrl = takeoverImageUrl.trim();
+      if (isDataImageUrl(savedBackgroundUrl)) {
+        const uploaded = await uploadImageRequest<{ image_url: string }>(
+          `/api/images/restaurants/${restaurant.id}/background`,
+          savedBackgroundUrl,
+        );
+        savedBackgroundUrl = uploaded.image_url;
+      }
+      if (isDataImageUrl(savedLogoUrl)) {
+        const uploaded = await uploadImageRequest<{ image_url: string }>(
+          `/api/images/restaurants/${restaurant.id}/logo`,
+          savedLogoUrl,
+        );
+        savedLogoUrl = uploaded.image_url;
+      }
+      if (isDataImageUrl(savedTakeoverUrl)) {
+        const uploaded = await uploadImageRequest<{ image_url: string }>(
+          `/api/images/restaurants/${restaurant.id}/takeover`,
+          savedTakeoverUrl,
+        );
+        savedTakeoverUrl = uploaded.image_url;
+      }
       await jsonRequest(`/api/restaurant/${restaurant.id}`, "PUT", {
         name: trimmedRestaurantName,
-        background_url: trimmedBackgroundUrl,
-        logo_url: trimmedLogoUrl,
+        background_url: savedBackgroundUrl,
+        logo_url: savedLogoUrl,
         logo_size: normalizedLogoSize,
         logo_fit: normalizedLogoFit,
         logo_position_x: normalizedLogoPositionX,
@@ -2788,14 +2860,14 @@ export default function AdminPage() {
         takeover_message: takeoverMessage.trim(),
         takeover_price: takeoverPrice.trim(),
         takeover_allergens: takeoverAllergens.trim(),
-        takeover_image_url: takeoverImageUrl.trim(),
+        takeover_image_url: savedTakeoverUrl,
       });
 
       setRestaurant({
         ...restaurant,
         name: trimmedRestaurantName,
-        background_url: trimmedBackgroundUrl,
-        logo_url: trimmedLogoUrl,
+        background_url: savedBackgroundUrl,
+        logo_url: savedLogoUrl,
         logo_size: normalizedLogoSize,
         logo_fit: normalizedLogoFit,
         logo_position_x: normalizedLogoPositionX,
@@ -2813,8 +2885,11 @@ export default function AdminPage() {
         takeover_message: takeoverMessage.trim(),
         takeover_price: takeoverPrice.trim(),
         takeover_allergens: takeoverAllergens.trim(),
-        takeover_image_url: takeoverImageUrl.trim(),
+        takeover_image_url: savedTakeoverUrl,
       });
+      setBackgroundUrl(savedBackgroundUrl);
+      setLogoUrl(savedLogoUrl);
+      setTakeoverImageUrl(savedTakeoverUrl);
       setLogoSize(normalizedLogoSize);
       setLogoFit(normalizedLogoFit);
       setLogoPositionX(normalizedLogoPositionX);
@@ -2957,6 +3032,14 @@ export default function AdminPage() {
     setSavingAction("takeover");
     setAdminNotice({ type: "info", message: "Saving promo popup settings..." });
     try {
+      let savedTakeoverUrl = takeoverImageUrl.trim();
+      if (isDataImageUrl(savedTakeoverUrl)) {
+        const uploaded = await uploadImageRequest<{ image_url: string }>(
+          `/api/images/restaurants/${restaurant.id}/takeover`,
+          savedTakeoverUrl,
+        );
+        savedTakeoverUrl = uploaded.image_url;
+      }
       await jsonRequest(`/api/restaurant/${restaurant.id}`, "PUT", {
         name: restaurant.name,
         background_url: restaurant.background_url || "",
@@ -2976,7 +3059,7 @@ export default function AdminPage() {
         takeover_message: takeoverMessage.trim(),
         takeover_price: takeoverPrice.trim(),
         takeover_allergens: takeoverAllergens.trim(),
-        takeover_image_url: takeoverImageUrl.trim(),
+        takeover_image_url: savedTakeoverUrl,
       });
       setRestaurant({
         ...restaurant,
@@ -2985,8 +3068,9 @@ export default function AdminPage() {
         takeover_message: takeoverMessage.trim(),
         takeover_price: takeoverPrice.trim(),
         takeover_allergens: takeoverAllergens.trim(),
-        takeover_image_url: takeoverImageUrl.trim(),
+        takeover_image_url: savedTakeoverUrl,
       });
+      setTakeoverImageUrl(savedTakeoverUrl);
       setAdminNotice({ type: "success", message: "Promo popup settings saved." });
     } catch (error: unknown) {
       console.error("Error saving takeover settings:", error);
@@ -3272,7 +3356,7 @@ export default function AdminPage() {
                       <div className="relative group bg-stone-100 rounded-lg border-2 border-dashed border-stone-200 w-20 h-14 flex-shrink-0 flex items-center justify-center overflow-hidden">
                         {logoUrl ? (
                           <>
-                            <img src={logoUrl} alt="Logo Preview" className="w-full h-full" style={logoPreviewStyle} />
+                            <img src={internalImageUrl(logoUrl, 256)} alt="Logo Preview" className="w-full h-full" style={logoPreviewStyle} />
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); clearLogo(); }}
@@ -3372,7 +3456,7 @@ export default function AdminPage() {
                       <div className="relative group bg-stone-100 rounded-lg border-2 border-dashed border-stone-200 w-20 h-14 flex-shrink-0 flex items-center justify-center overflow-hidden">
                         {backgroundUrl ? (
                           <>
-                            <img src={backgroundUrl} alt="Background Preview" className="w-full h-full object-cover" />
+                            <img src={internalImageUrl(backgroundUrl, 640)} alt="Background Preview" className="w-full h-full object-cover" />
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); setBackgroundUrl(""); }}
@@ -3560,7 +3644,7 @@ export default function AdminPage() {
                 {logoUrl ? (
                   <>
                     <img
-                      src={logoUrl}
+                      src={internalImageUrl(logoUrl, 512)}
                       alt="Logo Preview"
                       className="w-full h-full"
                       style={{ objectFit: logoFit, objectPosition: logoObjectPosition }}
@@ -3959,7 +4043,7 @@ export default function AdminPage() {
                   <div className="relative group bg-stone-50 rounded-xl border-2 border-dashed border-stone-200 w-36 h-24 flex items-center justify-center overflow-hidden">
                     {takeoverImageUrl ? (
                       <>
-                        <img src={takeoverImageUrl} alt="Promo" className="w-full h-full object-cover" />
+                        <img src={internalImageUrl(takeoverImageUrl, 640)} alt="Promo" className="w-full h-full object-cover" />
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); setTakeoverImageUrl(""); }}

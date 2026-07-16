@@ -1,4 +1,5 @@
 import express from "express";
+import compression from "compression";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import dotenv from "dotenv";
@@ -13,6 +14,7 @@ import { apiErrorHandler } from "./http/asyncRoute.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerHealthRoute } from "./routes/health.js";
 import { registerPublicMenuRoute } from "./routes/publicMenu.js";
+import { registerMediaRoutes } from "./routes/media.js";
 import { buildMenu } from "./domains/menu/service.js";
 import {
   formatMonthKey,
@@ -31,18 +33,17 @@ import { toJSON } from "./http/json.js";
 import { HttpError, errorMessage } from "./http/errors.js";
 import type { ScanStatisticsExportScope } from "../shared/types.js";
 import type { RestaurantDbRow } from "./domains/restaurants/types.js";
+import { MediaStorage, dataUrlBuffer } from "./domains/media/storage.js";
 import {
-  dataUrlToResponse,
-  resolveImageBuffer,
-  makeBackgroundTransparent,
-} from "./domains/images/processing.js";
+  publicMediaUrl,
+  type MediaTarget,
+} from "./domains/media/references.js";
 // Prefer local-only secrets file if present.
 dotenv.config({ path: ".env.local" });
 dotenv.config();
 
 // Database setup is performed by the explicit migration runner in server.ts.
 const openDatabases = new Set<Database.Database>();
-type ImageRow = { image_url?: string | null };
 type ReviewSettingsRow = { id: number; reviews_enabled: number };
 type CategoryDbRow = {
   id: number;
@@ -62,6 +63,7 @@ export async function startServer(options: { listen?: boolean } = {}) {
   const app = express();
   const config = loadConfig();
   const db = openDatabase(config.dbPath);
+  const mediaStorage = new MediaStorage(config.mediaDir);
   openDatabases.add(db);
   const PORT = config.port;
 
@@ -159,6 +161,7 @@ export async function startServer(options: { listen?: boolean } = {}) {
     };
   };
 
+  app.use(compression());
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
@@ -203,21 +206,22 @@ export async function startServer(options: { listen?: boolean } = {}) {
 
     res.status(401).json({ error: "Admin login required." });
   });
+  registerMediaRoutes(app, { db, storage: mediaStorage });
 
-  const getStoredImage = (type: string, id: number | string) => {
-    if (type === "product") {
-      const row = db
-        .prepare("SELECT image_url FROM products WHERE id = ?")
-        .get(id) as ImageRow | undefined;
-      return row?.image_url as string | null | undefined;
+  const normalizeImageValue = async (
+    raw: unknown,
+    target: MediaTarget,
+    current: string | null | undefined,
+  ): Promise<string | null> => {
+    if (isBlank(raw)) return null;
+    const value = String(raw).trim();
+    if (value === publicMediaUrl(target, current) || value.startsWith("media:")) {
+      return current || null;
     }
-    if (type === "category") {
-      const row = db
-        .prepare("SELECT image_url FROM categories WHERE id = ?")
-        .get(id) as ImageRow | undefined;
-      return row?.image_url as string | null | undefined;
+    if (value.startsWith("data:image/")) {
+      return mediaStorage.store(dataUrlBuffer(value), target);
     }
-    throw new Error("Unsupported image type.");
+    return value;
   };
 
   const getOrCreateRestaurantBySlug = (slug: string): RestaurantDbRow => {
@@ -277,7 +281,23 @@ export async function startServer(options: { listen?: boolean } = {}) {
       restaurant.current_month_scans = 0;
     }
 
-    res.json(toJSON(restaurant));
+    res.json(
+      toJSON({
+        ...restaurant,
+        background_url: publicMediaUrl(
+          { kind: "restaurants", id: restaurant.id, field: "background" },
+          restaurant.background_url,
+        ),
+        logo_url: publicMediaUrl(
+          { kind: "restaurants", id: restaurant.id, field: "logo" },
+          restaurant.logo_url,
+        ),
+        takeover_image_url: publicMediaUrl(
+          { kind: "restaurants", id: restaurant.id, field: "takeover" },
+          restaurant.takeover_image_url,
+        ),
+      }),
+    );
   });
 
   const readScanQuery = (value: unknown, name: string): string | undefined => {
@@ -377,7 +397,7 @@ export async function startServer(options: { listen?: boolean } = {}) {
   });
 
   // Update Restaurant
-  app.put("/api/restaurant/:id", (req, res) => {
+  app.put("/api/restaurant/:id", async (req, res) => {
     try {
       const {
         name,
@@ -406,14 +426,41 @@ export async function startServer(options: { listen?: boolean } = {}) {
 
       if (isNaN(id)) throw new Error("Invalid restaurant ID");
 
+      const current = db
+        .prepare(
+          "SELECT background_url, logo_url, takeover_image_url FROM restaurants WHERE id = ?",
+        )
+        .get(id) as {
+        background_url?: string | null;
+        logo_url?: string | null;
+        takeover_image_url?: string | null;
+      } | undefined;
+      const [finalBackground, finalLogo, finalTakeover] = await Promise.all([
+        normalizeImageValue(
+          background_url,
+          { kind: "restaurants", id, field: "background" },
+          current?.background_url,
+        ),
+        normalizeImageValue(
+          logo_url,
+          { kind: "restaurants", id, field: "logo" },
+          current?.logo_url,
+        ),
+        normalizeImageValue(
+          takeover_image_url,
+          { kind: "restaurants", id, field: "takeover" },
+          current?.takeover_image_url,
+        ),
+      ]);
+
       const result = db
         .prepare(
           "UPDATE restaurants SET name = ?, background_url = ?, logo_url = ?, logo_size = ?, logo_fit = ?, logo_position_x = ?, logo_position_y = ?, phone = ?, address = ?, wifi_password = ?, opening_hours = ?, facebook_url = ?, instagram_url = ?, takeover_enabled = ?, takeover_title = ?, takeover_message = ?, takeover_price = ?, takeover_allergens = ?, takeover_image_url = ?, footer_text = ?, footer_link = ? WHERE id = ?",
         )
         .run(
           String(name ?? "").trim(),
-          optionalText(background_url),
-          optionalText(logo_url),
+          finalBackground,
+          finalLogo,
           clampInteger(logo_size, 60, 180, 100),
           normalizeLogoFit(logo_fit),
           clampInteger(logo_position_x, 0, 100, 50),
@@ -429,11 +476,19 @@ export async function startServer(options: { listen?: boolean } = {}) {
           optionalText(takeover_message),
           optionalText(takeover_price),
           optionalText(takeover_allergens),
-          optionalText(takeover_image_url),
+          finalTakeover,
           optionalText(footer_text),
           optionalText(footer_link),
           id,
         );
+
+      if (finalBackground !== current?.background_url) {
+        mediaStorage.remove(current?.background_url);
+      }
+      if (finalLogo !== current?.logo_url) mediaStorage.remove(current?.logo_url);
+      if (finalTakeover !== current?.takeover_image_url) {
+        mediaStorage.remove(current?.takeover_image_url);
+      }
 
       res.json({ success: true, changes: result.changes });
     } catch (error: unknown) {
@@ -713,69 +768,56 @@ export async function startServer(options: { listen?: boolean } = {}) {
       res.status(status).json({ error: errorMessage(error) });
     }
   });
-  app.get("/api/images/categories/:id", (req, res) => {
-    const row = db
-      .prepare("SELECT image_url FROM categories WHERE id = ?")
-      .get(req.params.id) as ImageRow | undefined;
-    dataUrlToResponse(row?.image_url, res);
-  });
-
-  app.get("/api/images/products/:id", (req, res) => {
-    const row = db
-      .prepare("SELECT image_url FROM products WHERE id = ?")
-      .get(req.params.id) as ImageRow | undefined;
-    dataUrlToResponse(row?.image_url, res);
-  });
-
-  app.get("/api/images/restaurants/:id/:field", (req, res) => {
-    const field =
-      req.params.field === "background" ? "background_url" : "logo_url";
-    const row = db
-      .prepare(`SELECT ${field} AS image_url FROM restaurants WHERE id = ?`)
-      .get(req.params.id) as ImageRow | undefined;
-    dataUrlToResponse(row?.image_url, res);
-  });
-
-  app.post("/api/images/transparent-preview", async (req, res) => {
+  app.patch("/api/products/:id(\\d+)/image", async (req, res) => {
     try {
-      const { image_url, type, id } = req.body || {};
-      const source =
-        image_url || (type && id ? getStoredImage(type, id) : null);
-      const input = await resolveImageBuffer(source);
-      const output = await makeBackgroundTransparent(input);
-      res.json({
-        image_url: `data:image/png;base64,${output.toString("base64")}`,
-      });
-    } catch (error: unknown) {
-      console.error("Transparent preview error:", error);
-      res.status(400).json({
-        error: errorMessage(error) || "Could not make this image transparent.",
-      });
-    }
-  });
-
-  app.patch("/api/products/:id(\\d+)/image", (req, res) => {
-    try {
-      const imageUrl = optionalText(req.body?.image_url);
+      const id = Number(req.params.id);
+      const current = db
+        .prepare("SELECT image_url FROM products WHERE id = ?")
+        .get(id) as { image_url?: string | null } | undefined;
+      const imageUrl = await normalizeImageValue(
+        req.body?.image_url,
+        { kind: "products", id },
+        current?.image_url,
+      );
       db.prepare("UPDATE products SET image_url = ? WHERE id = ?").run(
         imageUrl,
-        req.params.id,
+        id,
       );
-      res.json(toJSON({ id: Number(req.params.id), image_url: imageUrl }));
+      if (imageUrl !== current?.image_url) mediaStorage.remove(current?.image_url);
+      res.json(
+        toJSON({
+          id,
+          image_url: publicMediaUrl({ kind: "products", id }, imageUrl),
+        }),
+      );
     } catch (error: unknown) {
       console.error("Product image update error:", error);
       res.status(500).json({ error: errorMessage(error) });
     }
   });
 
-  app.patch("/api/categories/:id(\\d+)/image", (req, res) => {
+  app.patch("/api/categories/:id(\\d+)/image", async (req, res) => {
     try {
-      const imageUrl = optionalText(req.body?.image_url);
+      const id = Number(req.params.id);
+      const current = db
+        .prepare("SELECT image_url FROM categories WHERE id = ?")
+        .get(id) as { image_url?: string | null } | undefined;
+      const imageUrl = await normalizeImageValue(
+        req.body?.image_url,
+        { kind: "categories", id },
+        current?.image_url,
+      );
       db.prepare("UPDATE categories SET image_url = ? WHERE id = ?").run(
         imageUrl,
-        req.params.id,
+        id,
       );
-      res.json(toJSON({ id: Number(req.params.id), image_url: imageUrl }));
+      if (imageUrl !== current?.image_url) mediaStorage.remove(current?.image_url);
+      res.json(
+        toJSON({
+          id,
+          image_url: publicMediaUrl({ kind: "categories", id }, imageUrl),
+        }),
+      );
     } catch (error: unknown) {
       console.error("Category image update error:", error);
       res.status(500).json({ error: errorMessage(error) });
@@ -824,19 +866,35 @@ export async function startServer(options: { listen?: boolean } = {}) {
           name,
           nameTr.en,
           nameTr.bg,
-          image_url || null,
+          null,
           parent_id || null,
           sort_order,
         );
 
+      const categoryId = Number(result.lastInsertRowid);
+      const storedImage = await normalizeImageValue(
+        image_url,
+        { kind: "categories", id: categoryId },
+        null,
+      );
+      if (storedImage) {
+        db.prepare("UPDATE categories SET image_url = ? WHERE id = ?").run(
+          storedImage,
+          categoryId,
+        );
+      }
+
       res.json(
         toJSON({
-          id: result.lastInsertRowid,
+          id: categoryId,
           restaurant_id,
           name,
           name_en: nameTr.en,
           name_bg: nameTr.bg,
-          image_url,
+          image_url: publicMediaUrl(
+            { kind: "categories", id: categoryId },
+            storedImage,
+          ),
           parent_id,
           sort_order,
           products: [],
@@ -863,26 +921,46 @@ export async function startServer(options: { listen?: boolean } = {}) {
       en: name_en ?? existing?.name_en,
       bg: name_bg ?? existing?.name_bg,
     });
+    const numericId = Number(id);
     const finalImage = !isBlank(image_url)
-      ? image_url
+      ? await normalizeImageValue(
+          image_url,
+          { kind: "categories", id: numericId },
+          existing?.image_url,
+        )
       : existing?.image_url || null;
 
     db.prepare(
       "UPDATE categories SET name = ?, name_en = ?, name_bg = ?, image_url = ? WHERE id = ?",
     ).run(baseName, nameTr.en, nameTr.bg, finalImage, id);
+    if (finalImage !== existing?.image_url) mediaStorage.remove(existing?.image_url);
     res.json(
       toJSON({
         id,
         name: baseName,
         name_en: nameTr.en,
         name_bg: nameTr.bg,
-        image_url: finalImage,
+        image_url: publicMediaUrl(
+          { kind: "categories", id: numericId },
+          finalImage,
+        ),
       }),
     );
   });
 
   app.delete("/api/categories/:id(\\d+)", (req, res) => {
+    const categoryImages = db
+      .prepare("SELECT image_url FROM categories WHERE id = ? OR parent_id = ?")
+      .all(req.params.id, req.params.id) as Array<{ image_url?: string | null }>;
+    const productImages = db
+      .prepare(
+        "SELECT p.image_url FROM products p JOIN categories c ON c.id = p.category_id WHERE c.id = ? OR c.parent_id = ?",
+      )
+      .all(req.params.id, req.params.id) as Array<{ image_url?: string | null }>;
     db.prepare("DELETE FROM categories WHERE id = ?").run(req.params.id);
+    for (const image of [...categoryImages, ...productImages]) {
+      mediaStorage.remove(image.image_url);
+    }
     res.json({ success: true });
   });
 
@@ -949,7 +1027,7 @@ export async function startServer(options: { listen?: boolean } = {}) {
           descBase,
           descTr.en,
           descTr.bg,
-          image_url || null,
+          null,
           is_available ?? 1,
           tags || null,
           allergens || null,
@@ -958,7 +1036,18 @@ export async function startServer(options: { listen?: boolean } = {}) {
           is_new ?? 0,
         );
 
-      const productId = result.lastInsertRowid;
+      const productId = Number(result.lastInsertRowid);
+      const storedImage = await normalizeImageValue(
+        image_url,
+        { kind: "products", id: productId },
+        null,
+      );
+      if (storedImage) {
+        db.prepare("UPDATE products SET image_url = ? WHERE id = ?").run(
+          storedImage,
+          productId,
+        );
+      }
 
       if (additions && Array.isArray(additions)) {
         const insertAddition = db.prepare(
@@ -988,7 +1077,10 @@ export async function startServer(options: { listen?: boolean } = {}) {
           description: descBase,
           description_en: descTr.en,
           description_bg: descTr.bg,
-          image_url,
+          image_url: publicMediaUrl(
+            { kind: "products", id: productId },
+            storedImage,
+          ),
           is_available: is_available ?? 1,
           tags,
           allergens,
@@ -1024,6 +1116,7 @@ export async function startServer(options: { listen?: boolean } = {}) {
         is_new,
       } = req.body;
       const productId = req.params.id;
+      const numericProductId = Number(productId);
 
       const existing = db
         .prepare("SELECT * FROM products WHERE id = ?")
@@ -1049,6 +1142,14 @@ export async function startServer(options: { listen?: boolean } = {}) {
             en: (description_en ?? existing?.description_en) || null,
             bg: (description_bg ?? existing?.description_bg) || null,
           };
+      const finalImage =
+        image_url === undefined
+          ? existing?.image_url || null
+          : await normalizeImageValue(
+              image_url,
+              { kind: "products", id: numericProductId },
+              existing?.image_url,
+            );
 
       db.prepare(
         `UPDATE products SET
@@ -1065,7 +1166,7 @@ export async function startServer(options: { listen?: boolean } = {}) {
         baseDesc,
         descTr.en,
         descTr.bg,
-        image_url || null,
+        finalImage,
         is_available ?? 1,
         tags || null,
         allergens || null,
@@ -1074,6 +1175,7 @@ export async function startServer(options: { listen?: boolean } = {}) {
         is_new ?? 0,
         productId,
       );
+      if (finalImage !== existing?.image_url) mediaStorage.remove(existing?.image_url);
 
       db.prepare("DELETE FROM additions WHERE product_id = ?").run(productId);
       if (additions && Array.isArray(additions)) {
@@ -1103,7 +1205,10 @@ export async function startServer(options: { listen?: boolean } = {}) {
           description: baseDesc,
           description_en: descTr.en,
           description_bg: descTr.bg,
-          image_url,
+          image_url: publicMediaUrl(
+            { kind: "products", id: numericProductId },
+            finalImage,
+          ),
           is_available: is_available ?? 1,
           tags,
           allergens,
@@ -1135,7 +1240,11 @@ export async function startServer(options: { listen?: boolean } = {}) {
   });
 
   app.delete("/api/products/:id(\\d+)", (req, res) => {
+    const existing = db
+      .prepare("SELECT image_url FROM products WHERE id = ?")
+      .get(req.params.id) as { image_url?: string | null } | undefined;
     db.prepare("DELETE FROM products WHERE id = ?").run(req.params.id);
+    mediaStorage.remove(existing?.image_url);
     res.json({ success: true });
   });
 
@@ -1424,8 +1533,20 @@ export async function startServer(options: { listen?: boolean } = {}) {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
+    app.use(
+      express.static(distPath, {
+        immutable: true,
+        maxAge: "1y",
+        index: false,
+        setHeaders: (res, filename) => {
+          if (path.basename(filename) === "index.html") {
+            res.setHeader("Cache-Control", "no-cache");
+          }
+        },
+      }),
+    );
     app.get("*", (_req, res) => {
+      res.setHeader("Cache-Control", "no-cache");
       res.sendFile(path.join(distPath, "index.html"));
     });
   }

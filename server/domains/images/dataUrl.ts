@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { publicMediaUrl } from "../media/references.js";
 
 export interface ParsedDataUrl {
   contentType: string;
@@ -27,8 +28,18 @@ export function compactImageUrl(
   field = "image",
 ): string | null | undefined {
   if (!imageUrl) return imageUrl;
+  const mediaUrl = publicMediaUrl(
+    type === "restaurants"
+      ? {
+          kind: type,
+          id,
+          field: field as "background" | "logo" | "takeover",
+        }
+      : { kind: type, id },
+    imageUrl,
+  );
+  if (mediaUrl !== imageUrl) return mediaUrl;
   if (!imageUrl.startsWith("data:") || imageUrl.length < 2048) return imageUrl;
-  if (type === "categories" && imageUrl.length > 500_000) return null;
   const version = imageVersion(imageUrl);
   return type === "restaurants"
     ? "/api/images/restaurants/" + id + "/" + field + "?v=" + version

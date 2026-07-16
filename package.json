@@ -10,7 +10,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "vite build && npm run bundle:check && tsc --project tsconfig.server.json",
+    "build": "vite build && npm run bundle:check && tsc --project tsconfig.server.json && npm run performance:check",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
@@ -21,7 +21,9 @@
     "typecheck": "npm run lint && npm run typecheck:server && npm run typecheck:strict",
     "db:fill-translations": "node scripts/fill-translations.cjs",
     "db:update-slug": "node scripts/update-slug.cjs",
+    "db:migrate-media": "tsx scripts/migrate-media.ts",
     "bundle:check": "node scripts/check-bundle-budget.mjs",
+    "performance:check": "node scripts/check-performance.mjs",
     "typecheck:strict": "tsc --project tsconfig.strict.json --pretty false"
   },
   "dependencies": {
@@ -29,6 +31,7 @@
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
     "better-sqlite3": "^12.4.1",
+    "compression": "^1.8.1",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "lucide-react": "^0.546.0",
@@ -43,6 +46,7 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
+    "@types/compression": "^1.8.1",
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "@types/react": "^19.0.0",

@@ -6,7 +6,7 @@ import { buildMenuTree } from "./tree.js";
 export function buildMenu(
   db: Database.Database,
   restaurantId: string | number,
-  compactImages = false,
+  _compactImages = true,
 ): Category[] {
   const allCategories = db
     .prepare(
@@ -43,24 +43,20 @@ export function buildMenu(
 
   const enrichedProducts = products.map((product) => ({
     ...product,
-    image_url: compactImages
-      ? compactImageUrl(
-          "products",
-          Number(product.id),
-          typeof product.image_url === "string" ? product.image_url : null,
-        )
-      : product.image_url,
+    image_url: compactImageUrl(
+      "products",
+      Number(product.id),
+      typeof product.image_url === "string" ? product.image_url : null,
+    ),
     additions: additionsByProduct.get(Number(product.id)) || [],
   }));
   const enrichedCategories = allCategories.map((category) => ({
     ...category,
-    image_url: compactImages
-      ? compactImageUrl(
-          "categories",
-          Number(category.id),
-          typeof category.image_url === "string" ? category.image_url : null,
-        )
-      : category.image_url,
+    image_url: compactImageUrl(
+      "categories",
+      Number(category.id),
+      typeof category.image_url === "string" ? category.image_url : null,
+    ),
     products: [],
     subcategories: [],
   }));

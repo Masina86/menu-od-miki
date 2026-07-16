@@ -1,14 +1,16 @@
 import fs from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
-import { resolveDbPath } from "../config.js";
+import { resolveDbPath, resolveSeedDbPath } from "../config.js";
 
-export function ensureDatabaseFile(dbPath = resolveDbPath()): string {
+export function ensureDatabaseFile(
+  dbPath = resolveDbPath(),
+  seedPath = resolveSeedDbPath(),
+): string {
   const directory = path.dirname(dbPath);
   fs.mkdirSync(directory, { recursive: true });
 
   if (!fs.existsSync(dbPath)) {
-    const seedPath = path.resolve(process.cwd(), "menu.db");
     if (fs.existsSync(seedPath) && path.resolve(seedPath) !== path.resolve(dbPath)) {
       fs.copyFileSync(seedPath, dbPath);
     }

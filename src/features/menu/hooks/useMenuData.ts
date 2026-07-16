@@ -36,7 +36,14 @@ export function useMenuData(slug: string | undefined): MenuDataState & {
         const sourceQuery = source === "qr" ? "?source=qr" : "";
         const response = await fetch(
           "/api/public-menu/" + slug + sourceQuery,
-          { signal: controller.signal },
+          {
+            signal: controller.signal,
+            // Menu settings can be changed from the admin dashboard. Always
+            // revalidate so a browser cannot keep showing a stale search bar,
+            // review setting, or promotion after an admin update. The server
+            // still serves the response from its fast in-memory cache.
+            cache: "no-cache",
+          },
         );
         if (!response.ok) throw new Error("Menu request failed.");
 

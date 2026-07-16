@@ -20,6 +20,8 @@ services:
       # Persistent DB location (requires a Render disk mounted at /var/data)
       - key: DB_PATH
         value: /var/data/menu.db
+      - key: MEDIA_DIR
+        value: /var/data/media
     disk:
       name: menu-data
       mountPath: /var/data

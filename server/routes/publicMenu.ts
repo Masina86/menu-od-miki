@@ -72,6 +72,12 @@ export function registerPublicMenuRoute(
         restaurant.logo_url,
         "logo",
       ),
+      takeover_image_url: compactImageUrl(
+        "restaurants",
+        restaurant.id,
+        restaurant.takeover_image_url,
+        "takeover",
+      ),
     };
     const menu = options.applyPopularCategory(
       buildMenu(options.db, restaurant.id, true),

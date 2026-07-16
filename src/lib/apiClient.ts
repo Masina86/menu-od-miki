@@ -73,6 +73,21 @@ export function jsonRequest<T>(
 export { ApiClientError as ApiError };
 export const apiRequest = request;
 
+export async function uploadImageRequest<T>(
+  input: RequestInfo | URL,
+  image: Blob | string,
+): Promise<T> {
+  const blob =
+    typeof image === "string"
+      ? await fetch(image).then((response) => response.blob())
+      : image;
+  return request<T>(input, {
+    method: "PUT",
+    headers: { "Content-Type": blob.type || "image/webp" },
+    body: blob,
+  });
+}
+
 function filenameFromContentDisposition(value: string | null): string | undefined {
   if (!value) return undefined;
   const match = value.match(

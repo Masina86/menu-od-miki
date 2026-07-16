@@ -8,5 +8,10 @@ coverage/
 .env*
 !.env.example
 menu.db.corrupted
+data/runtime/
+*.db-shm
+*.db-wal
+*.db-journal
+*.pre-media-v5.bak
 tmp_*
 test_*

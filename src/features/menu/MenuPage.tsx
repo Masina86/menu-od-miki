@@ -1,4 +1,6 @@
 import React, {
+  lazy,
+  Suspense,
   useState,
   useEffect,
   useRef,
@@ -6,7 +8,7 @@ import React, {
   useMemo,
 } from "react";
 import { useParams, Link } from "react-router-dom";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence } from "./components/MotionCompat";
 import {
   ALLERGEN_LABELS,
   type Restaurant,
@@ -15,8 +17,9 @@ import {
   type Language,
   type LogoFit,
 } from "../../../shared/types";
-import { ImageModal } from "../../components/media/ImageModal";
 import { MenuSearch } from "./components/MenuSearch";
+import { CategoryNav } from "./components/CategoryNav";
+import { internalImageSrcSet } from "../../lib/media";
 import { useMenuData } from "./hooks/useMenuData";
 import { useMenuSearch } from "./hooks/useMenuSearch";
 import { AllergenBadge } from "../../components/allergens/AllergenIcons";
@@ -29,6 +32,12 @@ import {
   productMatchesSearch,
   categoryMatchesSearch,
 } from "../../lib/menu";
+
+const LazyImageModal = lazy(() =>
+  import("../../components/media/ImageModal").then(({ ImageModal }) => ({
+    default: ImageModal,
+  })),
+);
 import {
   Maximize2,
   Settings,
@@ -291,6 +300,8 @@ const ProductCard: React.FC<ProductCardProps> = ({
           >
             <img
               src={product.image_url}
+              srcSet={internalImageSrcSet(product.image_url, [320, 640, 1000])}
+              sizes="(max-width: 640px) 100vw, 640px"
               alt={name}
               loading="lazy"
               decoding="async"
@@ -558,6 +569,8 @@ const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
             >
               <img
                 src={categoryThumbSrc}
+                srcSet={internalImageSrcSet(categoryThumbSrc, [320, 640, 1000])}
+                sizes="48px"
                 alt=""
                 loading="lazy"
                 decoding="async"
@@ -658,98 +671,6 @@ const CategoryDisplay: React.FC<CategoryDisplayProps> = ({
 };
 
 // ─── Sticky Category Nav ──────────────────────────────────────────────────────
-
-interface CategoryNavProps {
-  categories: Category[];
-  language: Language;
-  darkMode: boolean;
-  activeId: number | null;
-  onCategorySelect: (id: number) => void;
-  onCategoryView: (category: Category) => void;
-}
-
-const CategoryNav: React.FC<CategoryNavProps> = ({
-  categories,
-  language,
-  darkMode,
-  activeId,
-  onCategorySelect,
-  onCategoryView,
-}) => {
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  const scrollTo = (category: Category) => {
-    const id = category.id;
-    onCategoryView(category);
-    const el = document.getElementById(`cat-${id}`);
-    if (el) {
-      const offset = 104;
-      const top = el.getBoundingClientRect().top + window.scrollY - offset;
-      onCategorySelect(id);
-      window.scrollTo({ top, behavior: "smooth" });
-    } else {
-      onCategorySelect(id);
-    }
-    // Keep the active title centered in the horizontal nav.
-    const pill = scrollRef.current?.querySelector(`[data-cat="${id}"]`);
-    pill?.scrollIntoView({
-      behavior: "smooth",
-      inline: "center",
-      block: "nearest",
-    });
-  };
-
-  if (categories.length < 2) return null;
-
-  return (
-    <div
-      className={`sticky top-0 z-40 border-b backdrop-blur-xl
-      ${darkMode ? "bg-stone-900/90 border-stone-700" : "bg-white/90 border-stone-100"}`}
-    >
-      <div className="relative">
-        {/* Scrollable category titles */}
-        <div
-          ref={scrollRef}
-          className="flex justify-start md:justify-center overflow-x-scroll overflow-y-hidden gap-1.5 md:gap-2 px-2.5 md:px-3 py-1.5 md:py-2 scrollbar-none"
-          style={
-            {
-              scrollbarWidth: "none",
-              msOverflowStyle: "none",
-              // Keep layout stable when pills overflow in EN.
-              scrollbarGutter: "stable",
-            } as React.CSSProperties
-          }
-        >
-          {categories.map((cat) => {
-            const isActive = activeId === cat.id;
-            return (
-              <button
-                key={cat.id}
-                data-cat={cat.id}
-                type="button"
-                onClick={() => scrollTo(cat)}
-                aria-current={isActive ? "true" : undefined}
-                title={getLangValue(cat, "name", language)}
-                className={`min-h-8 md:min-h-11 flex-shrink-0 rounded-full px-3 md:px-4 py-1 md:py-2 border text-[10px] md:text-xs font-bold uppercase tracking-wide md:tracking-wider transition-colors whitespace-nowrap
-                  ${
-                    isActive
-                      ? darkMode
-                        ? "bg-stone-100 text-stone-900 border-stone-100 shadow-sm"
-                        : "bg-stone-900 text-white border-stone-900 shadow-sm"
-                      : darkMode
-                        ? "text-stone-400 border-stone-800 hover:text-stone-100 hover:border-stone-600"
-                        : "text-stone-500 border-stone-200 hover:text-stone-900 hover:border-stone-300"
-                  }`}
-              >
-                {getLangValue(cat, "name", language)}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-};
 
 // ─── Main MenuView ────────────────────────────────────────────────────────────
 
@@ -1226,6 +1147,11 @@ export default function MenuPage() {
             {restaurant.background_url ? (
               <img
                 src={restaurant.background_url}
+                srcSet={internalImageSrcSet(
+                  restaurant.background_url,
+                  [640, 1024, 1600],
+                )}
+                sizes="100vw"
                 alt={restaurant.name}
                 loading="eager"
                 decoding="async"
@@ -1243,6 +1169,11 @@ export default function MenuPage() {
             ) : restaurant.logo_url ? (
               <img
                 src={restaurant.logo_url}
+                srcSet={internalImageSrcSet(
+                  restaurant.logo_url,
+                  [256, 512, 1000],
+                )}
+                sizes="100vw"
                 alt={restaurant.name}
                 loading="eager"
                 decoding="async"
@@ -1277,6 +1208,11 @@ export default function MenuPage() {
                 <motion.img
                   variants={heroLogoVariants}
                   src={restaurant.logo_url}
+                  srcSet={internalImageSrcSet(
+                    restaurant.logo_url,
+                    [256, 512, 1000],
+                  )}
+                  sizes="(max-width: 640px) 180px, 280px"
                   alt={restaurant.name}
                   loading="eager"
                   decoding="async"
@@ -1465,6 +1401,11 @@ export default function MenuPage() {
             {restaurant.logo_url ? (
               <img
                 src={restaurant.logo_url}
+                srcSet={internalImageSrcSet(
+                  restaurant.logo_url,
+                  [256, 512, 1000],
+                )}
+                sizes="160px"
                 alt={restaurant.name}
                 loading="lazy"
                 decoding="async"
@@ -1606,13 +1547,17 @@ export default function MenuPage() {
           )}
         </AnimatePresence>
 
-        <ImageModal
-          isOpen={!!selectedProduct}
-          onClose={() => setSelectedProduct(null)}
-          product={selectedProduct}
-          language={language}
-          darkMode={darkMode}
-        />
+        {selectedProduct && (
+          <Suspense fallback={null}>
+            <LazyImageModal
+              isOpen
+              onClose={() => setSelectedProduct(null)}
+              product={selectedProduct}
+              language={language}
+              darkMode={darkMode}
+            />
+          </Suspense>
+        )}
 
         <AnimatePresence>
           {showTakeover && restaurant && (
@@ -1648,6 +1593,7 @@ export default function MenuPage() {
                   >
                     <button
                       type="button"
+                      aria-label="Close promotion"
                       className="absolute top-4 right-4 z-10 flex items-center justify-center w-10 h-10 rounded-full bg-black/50 text-white backdrop-blur-md hover:bg-black/70 transition-colors"
                       onClick={closeTakeover}
                     >
@@ -1658,6 +1604,11 @@ export default function MenuPage() {
                       <div className="w-full aspect-[4/3] sm:aspect-video relative overflow-hidden">
                         <img
                           src={restaurant.takeover_image_url}
+                          srcSet={internalImageSrcSet(
+                            restaurant.takeover_image_url,
+                            [640, 1024, 1600],
+                          )}
+                          sizes="(max-width: 640px) 100vw, 512px"
                           alt={restaurant.takeover_title || "Promo"}
                           className="w-full h-full object-cover"
                           decoding="async"

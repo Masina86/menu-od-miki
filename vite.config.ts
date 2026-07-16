@@ -15,6 +15,9 @@ export default defineConfig(({mode}) => {
         '@': path.resolve(__dirname, '.'),
       },
     },
+    build: {
+      manifest: true,
+    },
     server: {
       hmr: true,
       watch: {

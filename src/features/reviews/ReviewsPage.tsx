@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -182,48 +182,15 @@ export default function ReviewsPage() {
     });
   };
 
-  const fetchData = useCallback(async () => {
-    if (!slug) return;
-    setLoading(true);
-    try {
-      // Get restaurant info
-      const menuRes = await fetch(`/api/public-menu/${slug}`, {
-        cache: "no-store",
-      });
-      if (menuRes.ok) {
-        const data = await menuRes.json();
-        setRestaurant(data.restaurant);
-        setReviewsEnabled(data.restaurant?.reviews_enabled !== 0);
-      }
-
-      // Get reviews
-      if (menuRes.ok) {
-        const data = await menuRes.json().catch(() => null);
-        if (data?.restaurant?.id) {
-          const revRes = await fetch(`/api/reviews/${data.restaurant.id}`);
-          if (revRes.ok) {
-            const revData = await revRes.json();
-            setReviews(revData.reviews || []);
-            setReviewsEnabled(revData.reviews_enabled !== false);
-          }
-        }
-      }
-    } catch (err) {
-      console.error("Error loading reviews page:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, [slug]);
-
-  // Better fetch: separate calls
   useEffect(() => {
     const load = async () => {
       if (!slug) return;
       setLoading(true);
       try {
-        const menuRes = await fetch(`/api/public-menu/${slug}`, {
-          cache: "no-store",
-        });
+        const [menuRes, sessionRes] = await Promise.all([
+          fetch(`/api/public-menu/${slug}`, { cache: "no-store" }),
+          fetch("/api/auth/session"),
+        ]);
         if (!menuRes.ok) return;
         const menuData = await menuRes.json();
         const rest = menuData.restaurant;
@@ -239,8 +206,6 @@ export default function ReviewsPage() {
           }
         }
 
-        // Check admin
-        const sessionRes = await fetch("/api/auth/session");
         if (sessionRes.ok) {
           const s = await sessionRes.json();
           setIsAdminAuthenticated(!!s.authenticated);
