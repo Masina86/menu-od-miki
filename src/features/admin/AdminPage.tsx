@@ -138,6 +138,10 @@ const normalizeLogoFit = (value: unknown): LogoFit =>
 const isValidOptionalUrl = (value: string) => {
   const trimmed = value.trim();
   if (!trimmed || trimmed.startsWith("data:image/")) return true;
+  // Existing optimized uploads are exposed as relative, versioned API URLs
+  // (for example `/api/images/products/12?v=...`). They are valid image
+  // sources and must remain valid when an admin edits only the product price.
+  if (trimmed.startsWith("/api/images/")) return true;
   try {
     const url = new URL(trimmed);
     return url.protocol === "http:" || url.protocol === "https:";

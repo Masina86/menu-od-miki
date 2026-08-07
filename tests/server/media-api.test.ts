@@ -79,6 +79,28 @@ describe("media API", () => {
       "public, max-age=31536000, immutable",
     );
 
+    const product = await request(app)
+      .post("/api/products")
+      .set("Cookie", cookie)
+      .send({ category_id: categoryId, name: "Price test", price: 10 });
+    expect(product.status).toBe(200);
+    const productUpload = await request(app)
+      .put(`/api/images/products/${product.body.id}`)
+      .set("Cookie", cookie)
+      .set("Content-Type", "image/jpeg")
+      .send(image);
+    expect(productUpload.status).toBe(200);
+    const priceUpdate = await request(app)
+      .put(`/api/products/${product.body.id}`)
+      .set("Cookie", cookie)
+      .send({
+        name: "Price test",
+        price: 12,
+        image_url: productUpload.body.image_url,
+      });
+    expect(priceUpdate.status).toBe(200);
+    expect(priceUpdate.body.price).toBe(12);
+
     const menu = await request(app)
       .get("/api/menu/1")
       .set("Cookie", cookie);
